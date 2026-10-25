@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fragmente-Projekt Font Preview</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Unicase:wght@700&family=Diplomata+SC&family=Ewert&family=Grenze+Gotisch:wght@700&family=Jacquard+12&family=Major+Mono+Display&family=New+Rocker&family=Pirata+One&family=Rye&family=Special+Elite&family=UnifrakturMaguntia&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 28px;
+        color: #1d1d1f;
+        background: #f5f1ea;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font: 700 24px/1.2 Georgia, serif;
+      }
+
+      p {
+        max-width: 760px;
+        margin: 0 0 22px;
+        color: #5d6875;
+        line-height: 1.5;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 12px;
+      }
+
+      .card {
+        display: grid;
+        gap: 8px;
+        min-height: 150px;
+        padding: 14px;
+        border: 1px solid #d7dde2;
+        border-radius: 8px;
+        background: #ffffff;
+      }
+
+      .name {
+        color: #667085;
+        font-size: 12px;
+      }
+
+      .brand {
+        font-size: clamp(26px, 5vw, 42px);
+        line-height: 1;
+      }
+
+      .sample {
+        color: #344054;
+        font-size: 13px;
+        line-height: 1.4;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Fragmente-Projekt font preview</h1>
+    <p>
+      These candidates are from Google Fonts, whose FAQ says the catalog is open source and can be used commercially,
+      including logos, print, websites, and apps. This page is only for visual comparison.
+    </p>
+    <main class="grid">
+      <section class="card" style="font-family: 'Special Elite', serif">
+        <div class="name">Special Elite · worn typewriter</div>
+        <div class="brand">Fragmente-Projekt</div>
+        <div class="sample">A local-first poem collage, made from found text and small paper ghosts.</div>
+      </section>
+      <section class="card" style="font-family: 'Rye', serif">
+        <div class="name">Rye · woodtype western</div>
+        <div class="brand">Fragmente-Projekt</div>
+        <div class="sample">Rough, poster-like, good if the brand should feel like a printed sign.</div>
+      </section>
+      <section class="card" style="font-family: 'Ewert', serif">
+        <div class="name">Ewert · circus / ornamental slab</div>
+        <div class="brand">Fragmente-Projekt</div>
+        <div class="sample">Very distinctive; strong personality, lower everyday readability.</div>
+      </section>
+      <section class="card" style="font-family: 'UnifrakturMaguntia', serif">
+        <div class="name">UnifrakturMaguntia · blackletter</div>
+        <div class="brand">Fragmente-Projekt</div>
+        <div class="sample">Archival and old-world. Beautiful, but can feel formal or heavy.</div>
+      </section>
+      <section class="card" style="font-family: 'Grenze Gotisch', serif">
+        <div class="name">Grenze Gotisch · softer gothic</div>
+        <div class="brand">Fragmente-Projekt</div>
+        <div class="sample">A less severe gothic option, still strange enough to be memorable.</div>
+      </section>
+      <section class="card" style="font-family: 'Pirata One', serif">
+        <div class="name">Pirata One · rough blackletter display</div>
+        <div class="brand">Fragmente-Projekt</div>
+        <div class="sample">Energetic and dramatic; best if used only for the logo wordmark.</div>
+      </section>
+      <section class="card" style="font-family: 'New Rocker', serif">
+        <div class="name">New Rocker · tattoo / poster gothic</div>
+        <div class="brand">Fragmente-Projekt</div>
+        <div class="sample">Alternative and loud, with a handmade subculture feeling.</div>
+      </section>
+      <section class="card" style="font-family: 'Jacquard 12', serif">
+        <div class="name">Jacquard 12 · pixel textile blackletter</div>
+        <div class="brand">Fragmente-Projekt</div>
+        <div class="sample">Digital tapestry mood; unusual without going fully decorative.</div>
+      </section>
+      <section class="card" style="font-family: 'Diplomata SC', serif">
+        <div class="name">Diplomata SC · engraved caps</div>
+        <div class="brand">Fragmente-Projekt</div>
+        <div class="sample">Formal, vintage, plaque-like. Good for a quiet archival logo.</div>
+      </section>
+      <section class="card" style="font-family: 'Cormorant Unicase', serif">
+        <div class="name">Cormorant Unicase · literary odd serif</div>
+        <div class="brand">Fragmente-Projekt</div>
+        <div class="sample">Elegant and bookish, with enough weirdness in the mixed letterforms.</div>
+      </section>
+      <section class="card" style="font-family: 'Major Mono Display', monospace">
+        <div class="name">Major Mono Display · experimental mono</div>
+        <div class="brand">Fragmente-Projekt</div>
+        <div class="sample">Cool and mechanical, less vintage but very collage-tool appropriate.</div>
+      </section>
+    </main>
+  </body>
+</html>

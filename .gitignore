@@ -1,0 +1,8 @@
+node_modules/
+dist/
+release/
+outputs/
+.DS_Store
+*.log
+*.traineddata
+Fragmente-Projekt Library/
