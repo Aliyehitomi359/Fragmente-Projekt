@@ -1,9 +1,10 @@
 import { openDB, type DBSchema } from 'idb';
 import type { CollageCanvas, Fragment, FragmentBox, SourcePage } from './types';
+import { DEFAULT_BOX_ID, fragmentBoxIds, withFragmentBoxes } from './boxMembership';
 
 const DB_NAME = 'poem-collage-db';
 const DB_VERSION = 1;
-export const DEFAULT_BOX_ID = 'default-box';
+export { DEFAULT_BOX_ID } from './boxMembership';
 export const DEFAULT_CANVAS_ID = 'main-canvas';
 
 interface PoemCollageDB extends DBSchema {
@@ -116,7 +117,7 @@ export async function loadAllData() {
 
   return {
     sources: sources.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    fragments: fragments.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    fragments: fragments.map((fragment) => withFragmentBoxes(fragment, fragmentBoxIds(fragment))).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     boxes: boxes.sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
     canvases: canvases.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
   };
@@ -137,7 +138,7 @@ export async function deleteSource(sourceId: string) {
 
 export async function saveFragment(fragment: Fragment, syncFile = true) {
   const db = await dbPromise;
-  await db.put('fragments', fragment);
+  await db.put('fragments', withFragmentBoxes(fragment, fragmentBoxIds(fragment)));
   if (window.desktopLibrary && syncFile) {
     await window.desktopLibrary.store('fragment', fragment.id, fragment.imageBlob.type, new Uint8Array(await fragment.imageBlob.arrayBuffer()), fragment.ocrText || (fragment.imageBlob instanceof File ? fragment.imageBlob.name : ''));
   }
@@ -151,6 +152,19 @@ export async function deleteFragment(fragmentId: string) {
 export async function saveBox(box: FragmentBox) {
   const db = await dbPromise;
   await db.put('boxes', box);
+}
+
+export async function deleteBox(boxId: string) {
+  if (boxId === DEFAULT_BOX_ID) throw new Error('The default box cannot be deleted.');
+  const db = await dbPromise;
+  const tx = db.transaction(['boxes', 'fragments'], 'readwrite');
+  const fragments = await tx.objectStore('fragments').getAll();
+  for (const fragment of fragments.filter((item) => fragmentBoxIds(item).includes(boxId))) {
+    const remaining = fragmentBoxIds(fragment).filter((id) => id !== boxId);
+    await tx.objectStore('fragments').put(withFragmentBoxes({ ...fragment, updatedAt: nowIso() }, remaining));
+  }
+  await tx.objectStore('boxes').delete(boxId);
+  await tx.done;
 }
 
 export async function saveCanvas(canvas: CollageCanvas) {

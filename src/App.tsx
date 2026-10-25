@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type PointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
+import { fragmentBoxIds, withFragmentBoxes } from './boxMembership';
 import * as htmlToImage from 'html-to-image';
 import Tesseract from 'tesseract.js';
 import { FolderImports } from './FolderImports';
@@ -14,6 +15,7 @@ import {
   deleteSource as deleteSourceFromDb,
   deleteFragment as deleteFragmentFromDb,
   deleteCanvas as deleteCanvasFromDb,
+  deleteBox as deleteBoxFromDb,
 } from './db';
 import { createId, cropImageBlob, downloadBlob, downloadDataUrl, objectUrl } from './imageUtils';
 import type {
@@ -949,6 +951,7 @@ function EditableCanvasName({
   return (
     <input
       className="canvas-name-input"
+      style={{ width: `${Math.max(4, Array.from(draft).reduce((width, char) => width + (/[^\x00-\x7F]/.test(char) ? 2 : 1), 0) + 2)}ch` }}
       aria-label="Canvas name"
       value={draft}
       onChange={(event) => setDraft(event.currentTarget.value)}
@@ -971,35 +974,24 @@ function EditableCanvasName({
 function SourcePanel({
   sources,
   selectedSourceId,
-  canvases,
-  selectedCanvasId,
   notice,
   onUpload,
   onSelect,
   onOpenSource,
   onDelete,
   onUpdateSource,
-  onOpenCanvas,
-  onRenameCanvas,
-  onDeleteCanvas,
   onDismissNotice,
 }: {
   sources: SourcePage[];
   selectedSourceId?: string;
-  canvases: CollageCanvas[];
-  selectedCanvasId?: string;
   notice: string;
   onUpload: (files: File[]) => void;
   onSelect: (id: string) => void;
   onOpenSource: (id: string) => void;
   onDelete: (sourceId: string) => void;
   onUpdateSource: (source: SourcePage) => void;
-  onOpenCanvas: (canvasId: string) => void;
-  onRenameCanvas: (canvasId: string, name: string) => void;
-  onDeleteCanvas: (canvasId: string) => void;
   onDismissNotice: () => void;
 }) {
-  const [draftView, setDraftView] = useState<'sources' | 'canvases'>('sources');
   const [sourceFilter, setSourceFilter] = useState<'all' | 'favorites'>('all');
   const [sourceSearchQuery, setSourceSearchQuery] = useState('');
   const [openSourceMenuId, setOpenSourceMenuId] = useState<string | null>(null);
@@ -1025,89 +1017,31 @@ function SourcePanel({
 
   return (
     <aside className="panel left-panel">
-      <div className="brand-title">Fragmente-Projekt</div>
+      <div className="collection-heading" aria-label={`${sources.length} sources`}>
+        <span className="collection-emoji" aria-hidden="true">📖</span><span>{sources.length}</span>
+      </div>
       <UploadDropzone
         label="Upload sources"
         hint="Add images here, then cut specific words in the center workspace"
         onFiles={onUpload}
       />
-      <h2 className="draft-heading">Local library</h2>
-      <div className="draft-tabs">
-        <button className={draftView === 'sources' ? 'selected' : ''} onClick={() => setDraftView('sources')}>
-          Sources
-        </button>
-        <button className={draftView === 'canvases' ? 'selected' : ''} onClick={() => setDraftView('canvases')}>
-          Archived canvases
-        </button>
-      </div>
+      <h2 className="draft-heading">Sources</h2>
       {notice && (
         <div className="draft-notice">
           <span>{notice}</span>
           <button onClick={onDismissNotice}>Dismiss</button>
         </div>
       )}
-      {draftView === 'canvases' && (
-        <div className="canvas-draft-list">
-          {canvases.filter((canvas) => canvas.archivedAt).length === 0 && (
-            <div className="empty-library">No archived canvases yet.</div>
-          )}
-          {canvases.filter((canvas) => canvas.archivedAt).map((canvas) => (
-            <div
-              key={canvas.id}
-              className={`canvas-draft-card ${canvas.id === selectedCanvasId ? 'selected' : ''}`}
-              role="button"
-              tabIndex={0}
-              onClick={(event) => {
-                if ((event.target as HTMLElement).closest('input, button')) {
-                  return;
-                }
-                onOpenCanvas(canvas.id);
-              }}
-              onDoubleClick={(event) => {
-                if ((event.target as HTMLElement).closest('input, button')) {
-                  return;
-                }
-                onOpenCanvas(canvas.id);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && !(event.target as HTMLElement).closest('input, button')) {
-                  onOpenCanvas(canvas.id);
-                }
-              }}
-            >
-              <EditableCanvasName canvas={canvas} onRename={onRenameCanvas} />
-              <span>
-                Archived {new Date(canvas.archivedAt ?? canvas.updatedAt).toLocaleString()} · {canvas.width} x {canvas.height} ·{' '}
-                {canvas.placements.length} placement{canvas.placements.length === 1 ? '' : 's'}
-              </span>
-              <div className="canvas-draft-actions">
-                <button
-                  className="danger-button"
-                  onClick={() => {
-                    if (window.confirm(`Delete canvas "${canvas.name}"? This removes the saved canvas draft.`)) {
-                      onDeleteCanvas(canvas.id);
-                    }
-                  }}
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      {draftView === 'sources' && (
-        <>
       <div className="source-filter-row">
         <button className={sourceFilter === 'all' ? 'selected' : ''} onClick={() => setSourceFilter('all')}>
-          All sources
+          All
         </button>
         <button className={sourceFilter === 'favorites' ? 'selected' : ''} onClick={() => setSourceFilter('favorites')}>
-          Favorite sources
+          Favorites
         </button>
       </div>
       <label className="source-search">
-        Search source
+        Search by text
         <input
           value={sourceSearchQuery}
           onChange={(event) => setSourceSearchQuery(event.target.value)}
@@ -1259,8 +1193,6 @@ function SourcePanel({
           </div>
         ))}
       </div>
-        </>
-      )}
     </aside>
   );
 }
@@ -1275,6 +1207,11 @@ function SourceViewer({
   onSaveFragment: (source: SourcePage, region: SelectionRect) => Promise<void>;
 }) {
   const imageRef = useRef<HTMLImageElement | null>(null);
+  const viewerRef = useRef<HTMLDivElement | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [showZoomHint, setShowZoomHint] = useState(false);
+  const zoomRef = useRef(1);
+  const [viewerWidth, setViewerWidth] = useState(800);
   const [imageSize, setImageSize] = useState({ naturalWidth: 0, naturalHeight: 0, displayWidth: 0, displayHeight: 0 });
   const [selection, setSelection] = useState<SelectionRect | null>(null);
   const [draft, setDraft] = useState<{ startX: number; startY: number } | null>(null);
@@ -1284,11 +1221,49 @@ function SourceViewer({
   const [isDropActive, setIsDropActive] = useState(false);
   const [saving, setSaving] = useState(false);
   const hasUsableSelection = !!selection && selection.width >= 4 && selection.height >= 4;
+  const fitScale = imageSize.naturalWidth ? Math.min(1, viewerWidth / imageSize.naturalWidth, 720 / imageSize.naturalHeight) : 1;
+
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+    const observer = new ResizeObserver(() => setViewerWidth(Math.max(1, viewer.clientWidth - 20)));
+    observer.observe(viewer);
+    const handleWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey || !imageRef.current) return;
+      event.preventDefault();
+      if (event.deltaY === 0) return;
+      if (localStorage.getItem('fragmente-zoom-hint-seen') !== 'true') {
+        localStorage.setItem('fragmente-zoom-hint-seen', 'true');
+        setShowZoomHint(true);
+      }
+      const oldZoom = zoomRef.current;
+      const nextZoom = Math.max(0.25, Math.min(6, oldZoom * Math.exp(-event.deltaY * 0.01)));
+      const rect = viewer.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      const scrollX = (viewer.scrollLeft + x) * (nextZoom / oldZoom) - x;
+      const scrollY = (viewer.scrollTop + y) * (nextZoom / oldZoom) - y;
+      zoomRef.current = nextZoom;
+      setZoom(nextZoom);
+      requestAnimationFrame(() => viewer.scrollTo(scrollX, scrollY));
+    };
+    viewer.addEventListener('wheel', handleWheel, { passive: false });
+    return () => { observer.disconnect(); viewer.removeEventListener('wheel', handleWheel); };
+  }, []);
+
+  useEffect(() => {
+    if (!showZoomHint) return;
+    const timer = window.setTimeout(() => setShowZoomHint(false), 8000);
+    return () => window.clearTimeout(timer);
+  }, [showZoomHint]);
 
   useEffect(() => {
     setSelection(null);
     setDraft(null);
     setMoveDraft(null);
+    zoomRef.current = 1;
+    setZoom(1);
+    viewerRef.current?.scrollTo(0, 0);
   }, [source?.id]);
 
   function pointerPoint(event: PointerEvent<HTMLDivElement>) {
@@ -1299,7 +1274,7 @@ function SourceViewer({
     const rect = image.getBoundingClientRect();
     const x = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
     const y = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
-    return { x, y };
+    return { x: x * image.naturalWidth / rect.width, y: y * image.naturalHeight / rect.height };
   }
 
   function updateSelection(event: PointerEvent<HTMLDivElement>, start = draft) {
@@ -1357,8 +1332,12 @@ function SourceViewer({
     <section className="workspace-section">
       <div className="section-head">
         <h2>Source Viewer</h2>
+        {source && <div className="zoom-control"><button title="Click to reset image size" onClick={() => { zoomRef.current = 1; setZoom(1); setShowZoomHint(false); viewerRef.current?.scrollTo(0, 0); }}>{Math.round(zoom * 100)}%</button>
+          {showZoomHint && <span className="zoom-hint" role="status">Click the percentage to reset image size.</span>}
+        </div>}
       </div>
       <div
+        ref={viewerRef}
         className={`source-viewer ${isDropActive ? 'drop-active' : ''}`}
         onDragOver={(event) => {
           event.preventDefault();
@@ -1379,8 +1358,10 @@ function SourceViewer({
           />
         )}
         {source && (
+          <div className="source-zoom-space" style={{ width: imageSize.naturalWidth * fitScale * zoom || undefined, height: imageSize.naturalHeight * fitScale * zoom || undefined }}>
           <div
             className="image-stage"
+            style={{ width: imageSize.naturalWidth * fitScale || undefined, transform: `scale(${zoom})`, transformOrigin: 'top left' }}
             onPointerDown={(event) => {
               event.preventDefault();
               const point = pointerPoint(event);
@@ -1421,8 +1402,8 @@ function SourceViewer({
                 setImageSize({
                   naturalWidth: image.naturalWidth,
                   naturalHeight: image.naturalHeight,
-                  displayWidth: image.clientWidth,
-                  displayHeight: image.clientHeight,
+                  displayWidth: image.naturalWidth,
+                  displayHeight: image.naturalHeight,
                 });
                 imageRef.current = image;
               }}
@@ -1444,10 +1425,10 @@ function SourceViewer({
                 <div
                   className="selection-box"
                   style={{
-                    left: selection.x,
-                    top: selection.y,
-                    width: selection.width,
-                    height: selection.height,
+                    left: `${selection.x / imageSize.naturalWidth * 100}%`,
+                    top: `${selection.y / imageSize.naturalHeight * 100}%`,
+                    width: `${selection.width / imageSize.naturalWidth * 100}%`,
+                    height: `${selection.height / imageSize.naturalHeight * 100}%`,
                   }}
                   onPointerDown={(event) => {
                     event.preventDefault();
@@ -1465,8 +1446,8 @@ function SourceViewer({
                   <div
                     className="selection-actions"
                     style={{
-                      left: selection.x,
-                      top: selection.y + selection.height + 8,
+                      left: `${selection.x / imageSize.naturalWidth * 100}%`,
+                      top: `calc(${(selection.y + selection.height) / imageSize.naturalHeight * 100}% + 8px)`,
                     }}
                     onPointerDown={(event) => event.stopPropagation()}
                     onClick={(event) => event.stopPropagation()}
@@ -1474,13 +1455,14 @@ function SourceViewer({
                     <button onClick={saveSelection} disabled={saving}>
                       {saving ? 'Saving...' : 'Save to box'}
                     </button>
-                    <button onClick={() => setSelection(null)} disabled={saving}>
-                      Cancel
+                    <button className="selection-cancel" aria-label="Cancel selection" title="Cancel selection" onClick={() => setSelection(null)} disabled={saving}>
+                      &#215;
                     </button>
                   </div>
                 )}
               </>
             )}
+          </div>
           </div>
         )}
       </div>
@@ -2150,12 +2132,14 @@ function CanvasSetup({
   onOpenCanvas,
   onDeleteCanvas,
   onSelectPreset,
+  onRenameCanvas,
 }: {
   canvases: CollageCanvas[];
   selectedCanvasId?: string;
   onOpenCanvas: (canvasId: string) => void;
   onDeleteCanvas: (canvasId: string) => void;
   onSelectPreset: (preset: CanvasPreset) => void;
+  onRenameCanvas: (canvasId: string, name: string) => void;
 }) {
   const selectedCanvas = canvases.find((canvas) => canvas.id === selectedCanvasId) ?? canvases[0];
   const [openCanvasMenuId, setOpenCanvasMenuId] = useState<string | null>(null);
@@ -2177,6 +2161,13 @@ function CanvasSetup({
             <span>
               {preset.width} x {preset.height}
             </span>
+            <span className="preset-preview" role="tooltip">
+              <span className="preset-preview-stage">
+                <span className="preset-preview-paper" style={{ width: preset.width / 8, height: preset.height / 8 }} />
+              </span>
+              <span>{preset.name}</span>
+              <span>{preset.width} × {preset.height} px</span>
+            </span>
           </button>
         ))}
       </div>
@@ -2188,15 +2179,15 @@ function CanvasSetup({
             className={`canvas-work-card ${canvas.id === selectedCanvasId ? 'selected' : ''}`}
             role="button"
             tabIndex={0}
-            onClick={() => onOpenCanvas(canvas.id)}
+            onClick={(event) => { if (!(event.target as HTMLElement).closest('input, button')) onOpenCanvas(canvas.id); }}
             onKeyDown={(event) => {
-              if (event.key === 'Enter') {
+              if (event.key === 'Enter' && !(event.target as HTMLElement).closest('input, button')) {
                 onOpenCanvas(canvas.id);
               }
             }}
           >
             <strong>
-              {canvas.name}
+              <EditableCanvasName canvas={canvas} onRename={onRenameCanvas} />
               {canvas.id === selectedCanvasId && <span className="canvas-current-badge">You were working here</span>}
             </strong>
             <span>
@@ -2505,7 +2496,7 @@ function InspirationSessionPanel({
     <aside className="panel right-panel inspiration-session" data-session-dropzone="true">
       <h2>Inspiration session 1</h2>
       <p>
-        This is temporary. Fragments keep their original box until you save this session as a new box.
+        This is temporary. Saving as a new box also keeps fragments in their existing boxes.
       </p>
       <div
         className="session-dropzone"
@@ -2557,18 +2548,42 @@ function BoxControls({
   activeBoxId,
   onActiveBoxChange,
   onCreateBox,
+  onRenameBox,
+  onDeleteBox,
 }: {
   boxes: FragmentBox[];
   activeBoxId: string;
   onActiveBoxChange: (boxId: string) => void;
   onCreateBox: (name: string) => Promise<void>;
+  onRenameBox: (box: FragmentBox, name: string) => Promise<void>;
+  onDeleteBox: (box: FragmentBox) => Promise<void>;
 }) {
   const [name, setName] = useState('');
   const [isCreatingBox, setIsCreatingBox] = useState(false);
+  const [editingBoxId, setEditingBoxId] = useState<string | null>(null);
+  const [boxName, setBoxName] = useState('');
+  const [menuBoxId, setMenuBoxId] = useState<string | null>(null);
+  const controlsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuBoxId) return;
+    const dismissOutside = (event: globalThis.PointerEvent) => {
+      if (!controlsRef.current?.querySelector('.box-options-menu')?.contains(event.target as Node)) setMenuBoxId(null);
+    };
+    const dismissOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuBoxId(null);
+    };
+    document.addEventListener('pointerdown', dismissOutside);
+    document.addEventListener('keydown', dismissOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', dismissOutside);
+      document.removeEventListener('keydown', dismissOnEscape);
+    };
+  }, [menuBoxId]);
 
   return (
-    <div className="box-controls">
-      <h2>Boxes</h2>
+    <div className="box-controls" ref={controlsRef}>
+      <h2>Fragments</h2>
       <div className="box-row">
         <button className={activeBoxId === 'all' ? 'selected' : ''} onClick={() => onActiveBoxChange('all')}>
           All
@@ -2579,16 +2594,46 @@ function BoxControls({
         >
           Favorites
         </button>
-        {boxes.map((box) => (
+        {boxes.map((box) => editingBoxId === box.id ? (
+          <input key={box.id} className="box-name-edit" autoFocus aria-label="Box name"
+            value={boxName} onChange={(event) => setBoxName(event.currentTarget.value)}
+            onBlur={() => { const next = boxName.trim(); setEditingBoxId(null); if (next && next !== box.name) void onRenameBox(box, next); }}
+            onKeyDown={(event) => { if (event.nativeEvent.isComposing) return; if (event.key === 'Enter') event.currentTarget.blur(); if (event.key === 'Escape') setEditingBoxId(null); }}
+          />
+        ) : (
+          <div key={box.id} className="box-tab-group">
           <button
             key={box.id}
             className={activeBoxId === box.id ? 'selected' : ''}
-            onClick={() => onActiveBoxChange(box.id)}
+            onClick={(event) => {
+              if (event.metaKey || event.altKey || event.ctrlKey) {
+                event.preventDefault();
+                setMenuBoxId(box.id);
+              } else {
+                setMenuBoxId(null);
+                onActiveBoxChange(box.id);
+              }
+            }}
+            onContextMenu={(event) => { event.preventDefault(); setMenuBoxId(box.id); }}
+            aria-haspopup="menu"
+            aria-expanded={menuBoxId === box.id}
+            title="Double-click to rename; right-click or modifier-click for box actions"
+            onDoubleClick={() => { setEditingBoxId(box.id); setBoxName(box.name); }}
           >
-            {box.id === DEFAULT_BOX_ID ? 'Default' : box.name}
+            {box.id === DEFAULT_BOX_ID && box.name === 'Default Box' ? 'Boxed' : box.name}
           </button>
+          {menuBoxId === box.id && <div className="box-options-menu" role="menu" aria-label={`${box.name} actions`}>
+            <button onClick={() => { setEditingBoxId(box.id); setBoxName(box.name); setMenuBoxId(null); }}>Rename</button>
+            {box.id !== DEFAULT_BOX_ID && <button className="danger-button" onClick={() => {
+              if (window.confirm(`Delete box "${box.name}"? Fragments will stay in their other boxes, or return to the default box if needed. No fragments will be deleted.`)) {
+                setMenuBoxId(null); void onDeleteBox(box);
+              }
+            }}>Delete box</button>}
+            <button onClick={() => setMenuBoxId(null)}>Close</button>
+          </div>}
+          </div>
         ))}
-        {!isCreatingBox && <button onClick={() => setIsCreatingBox(true)}>New box</button>}
+        {!isCreatingBox && <button title="New box" aria-label="New box" onClick={() => setIsCreatingBox(true)}>+</button>}
       </div>
       {isCreatingBox && (
         <form
@@ -2647,11 +2692,11 @@ function FragmentLibrary({
       ? fragments
       : activeBoxId === 'favorites'
         ? fragments.filter((fragment) => fragment.isFavorite)
-        : fragments.filter((fragment) => fragment.boxId === activeBoxId);
+        : fragments.filter((fragment) => fragmentBoxIds(fragment).includes(activeBoxId));
   const visibleFragments = normalizedSearch
     ? fragmentsInBox.filter((fragment) => {
         const source = fragment.sourcePageId ? sourceById.get(fragment.sourcePageId) : undefined;
-        const boxName = boxes.find((box) => box.id === fragment.boxId)?.name ?? '';
+        const boxName = boxes.filter((box) => fragmentBoxIds(fragment).includes(box.id)).map((box) => box.name).join(' ');
         const searchableText = [
           fragment.ocrText,
           boxName,
@@ -2675,7 +2720,7 @@ function FragmentLibrary({
   return (
     <aside className="panel right-panel">
       <label className="fragment-search">
-        Search OCR text
+        Search by text
         <input
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
@@ -2713,22 +2758,18 @@ function FragmentLibrary({
             </button>
             {openMenuId === fragment.id && (
               <div className="fragment-menu">
-                <label>
-                  Stored in
-                  <select
-                    value={fragment.boxId}
-                    onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-                      void onUpdateFragment({ ...fragment, boxId: event.target.value, updatedAt: nowIso() });
-                      setOpenMenuId(null);
-                    }}
-                  >
-                    {boxes.map((box) => (
-                      <option key={box.id} value={box.id}>
-                        {box.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <fieldset className="fragment-box-memberships">
+                  <legend>Stored in</legend>
+                  {boxes.map((box) => <label key={box.id}>
+                    <input type="checkbox" checked={fragmentBoxIds(fragment).includes(box.id)}
+                      onChange={(event) => {
+                        const ids = fragmentBoxIds(fragment);
+                        const next = event.currentTarget.checked ? [...ids, box.id] : ids.filter((id) => id !== box.id);
+                        void onUpdateFragment(withFragmentBoxes({ ...fragment, updatedAt: nowIso() }, next));
+                      }} />
+                    {box.name}
+                  </label>)}
+                </fieldset>
                 <button className="danger-button" onClick={() => void onDeleteFragment(fragment.id)}>
                   Delete fragment
                 </button>
@@ -2839,6 +2880,7 @@ export default function App() {
   const [data, setData] = useState<AppData | null>(null);
   const [selectedSourceId, setSelectedSourceId] = useState<string | undefined>();
   const [selectedCanvasId, setSelectedCanvasId] = useState<string | undefined>();
+  const [workingCanvasId, setWorkingCanvasId] = useState<string | undefined>();
   const [activeBoxId, setActiveBoxId] = useState('all');
   const [error, setError] = useState('');
   const [backupStatus, setBackupStatus] = useState('');
@@ -3142,7 +3184,7 @@ export default function App() {
     const box: FragmentBox = { id: createId('box'), name, createdAt: nowIso() };
     const sessionSet = new Set(inspirationFragmentIds);
     const nextFragments = data.fragments.map((fragment) =>
-      sessionSet.has(fragment.id) ? { ...fragment, boxId: box.id, updatedAt: nowIso() } : fragment,
+      sessionSet.has(fragment.id) ? withFragmentBoxes({ ...fragment, updatedAt: nowIso() }, [...fragmentBoxIds(fragment), box.id]) : fragment,
     );
     await saveBox(box);
     await Promise.all(nextFragments.filter((fragment) => sessionSet.has(fragment.id)).map((fragment) => saveFragment(fragment)));
@@ -3207,6 +3249,7 @@ export default function App() {
   }
 
   function openCanvas(canvasId: string) {
+    setWorkingCanvasId(canvasId);
     setSelectedCanvasId(canvasId);
     setWorkspaceMode('canvas');
   }
@@ -3237,6 +3280,7 @@ export default function App() {
     await saveCanvas(nextCanvas);
     setData({ ...data, canvases: [nextCanvas, ...data.canvases] });
     setSelectedCanvasId(nextCanvas.id);
+    setWorkingCanvasId(nextCanvas.id);
     setWorkspaceMode('canvas');
     setDraftNotice('Previous canvas saved. New canvas created.');
   }
@@ -3250,8 +3294,10 @@ export default function App() {
         preserve_interword_spaces: '0',
       });
       const result = await worker.recognize(fragment.imageBlob);
+      const latestFragment = (await loadAllData()).fragments.find((item) => item.id === fragment.id);
+      if (!latestFragment) return;
       const updatedFragment = {
-        ...fragment,
+        ...latestFragment,
         ocrStatus: 'done' as const,
         ocrText: normalizeOcrText(result.data.text),
         updatedAt: nowIso(),
@@ -3267,7 +3313,9 @@ export default function App() {
       );
       setLibraryNotice(`OCR recognized: ${updatedFragment.ocrText || 'No text found. You can edit the search text manually.'}`);
     } catch {
-      const updatedFragment = { ...fragment, ocrStatus: 'error' as const, updatedAt: nowIso() };
+      const latestFragment = (await loadAllData()).fragments.find((item) => item.id === fragment.id);
+      if (!latestFragment) return;
+      const updatedFragment = { ...latestFragment, ocrStatus: 'error' as const, updatedAt: nowIso() };
       await saveFragment(updatedFragment);
       setData((current) =>
         current
@@ -3478,11 +3526,10 @@ export default function App() {
         setTransferNotice(target === 'source' ? 'Moved to Sources.' : 'Moved to Fragments.');
       }).catch((failure) => setError(String(failure)));
     }}>
+      <header className="app-brand-header"><div className="brand-title">Fragmente-Projekt</div></header>
       <SourcePanel
         sources={data.sources}
         selectedSourceId={selectedSource?.id}
-        canvases={data.canvases}
-        selectedCanvasId={selectedCanvas?.id}
         notice={draftNotice}
         onUpload={(files) => void uploadSources(files).catch((failure) => setError(`Upload could not be saved to the library: ${String(failure)}`))}
         onSelect={setSelectedSourceId}
@@ -3492,9 +3539,6 @@ export default function App() {
         }}
         onDelete={(sourceId) => void removeSource(sourceId)}
         onUpdateSource={(source) => void updateSource(source)}
-        onOpenCanvas={openCanvas}
-        onRenameCanvas={(canvasId, name) => void renameCanvas(canvasId, name)}
-        onDeleteCanvas={(canvasId) => void removeCanvas(canvasId)}
         onDismissNotice={() => setDraftNotice('')}
       />
       <section className="center-panel">
@@ -3515,11 +3559,24 @@ export default function App() {
             Inspiration Table
           </button>
           <button
-            className={workspaceMode === 'canvas' || workspaceMode === 'canvas-setup' ? 'selected' : ''}
+            className={workspaceMode === 'canvas-setup' ? 'selected' : ''}
             onClick={() => setWorkspaceMode('canvas-setup')}
           >
             Collage Canvas
           </button>
+          {data.canvases.filter((canvas) => canvas.id === workingCanvasId).map((canvas) => <div key={canvas.id} className="working-canvas-tab-group"><button
+            className={`working-canvas-tab ${workspaceMode === 'canvas' && selectedCanvas?.id === canvas.id ? 'selected' : ''}`}
+            title={canvas.name}
+            onClick={() => openCanvas(canvas.id)}
+          >{canvas.name}</button><button
+            className="working-canvas-close"
+            title="Close canvas tab"
+            aria-label={`Close tab for ${canvas.name}`}
+            onClick={() => {
+              setWorkingCanvasId(undefined);
+              if (workspaceMode === 'canvas' && selectedCanvas?.id === canvas.id) setWorkspaceMode('canvas-setup');
+            }}
+          >&#215;</button></div>)}
         </div>
         {workspaceMode === 'cut' && (
           <SourceViewer
@@ -3542,6 +3599,7 @@ export default function App() {
             onOpenCanvas={openCanvas}
             onDeleteCanvas={(canvasId) => void removeCanvas(canvasId)}
             onSelectPreset={(preset) => void chooseCanvasPreset(preset)}
+            onRenameCanvas={(canvasId, name) => void renameCanvas(canvasId, name)}
           />
         )}
         {workspaceMode === 'canvas' && selectedCanvas && (
@@ -3556,6 +3614,9 @@ export default function App() {
         )}
       </section>
       <section className="panel right-stack">
+        <div className="collection-heading" aria-label={`${data.fragments.length} fragments`}>
+          <span className="collection-emoji" aria-hidden="true">🏷️</span><span>{data.fragments.length}</span>
+        </div>
         <UploadDropzone
           label="Upload fragments"
           hint="Already have cropped word images? Add them directly here"
@@ -3585,6 +3646,17 @@ export default function App() {
               activeBoxId={activeBoxId}
               onActiveBoxChange={setActiveBoxId}
               onCreateBox={createBox}
+              onRenameBox={async (box, name) => {
+                try { await saveBox({ ...box, name }); await refresh(); }
+                catch (failure) { setError(`Box could not be renamed: ${String(failure)}`); }
+              }}
+              onDeleteBox={async (box) => {
+                try {
+                  await deleteBoxFromDb(box.id);
+                  if (activeBoxId === box.id) setActiveBoxId(DEFAULT_BOX_ID);
+                  await refresh();
+                } catch (failure) { setError(`Box could not be deleted: ${String(failure)}`); }
+              }}
             />
             {libraryNotice && (
               <div className="library-notice">

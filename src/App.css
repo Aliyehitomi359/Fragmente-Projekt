@@ -131,7 +131,17 @@ h2 {
   background: #f8f9fb;
   border: 1px solid #d7dde2;
   border-radius: 8px;
+  flex-wrap: wrap;
 }
+
+.working-canvas-tab { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.working-canvas-tab-group { display: inline-flex; align-items: center; gap: 0; min-width: 0; border: 1px solid #b9c0c7; border-radius: 6px; background: #ffffff; }
+.working-canvas-tab-group:has(.selected) { border-color: #2463eb; background: #eaf0ff; }
+.working-canvas-tab-group .working-canvas-tab { border: 0; background: transparent; }
+.working-canvas-close { width: 26px; height: 30px; padding: 0; border: 0; background: transparent; font-size: 18px; line-height: 1; flex-shrink: 0; }
+.working-canvas-close:hover { background: #e5e7eb; }
+.zoom-control { position: relative; }
+.zoom-hint { position: absolute; top: calc(100% + 6px); right: 0; width: 230px; padding: 8px 10px; border: 1px solid #b7e4c7; border-radius: 6px; color: #24513d; background: #ecfdf3; font-size: 12px; z-index: 12; }
 
 .workspace-switch button.selected {
   border-color: #2463eb;
@@ -335,15 +345,20 @@ h2 {
 }
 
 .source-viewer {
-  display: grid;
-  place-items: center;
+  display: block;
   min-height: 560px;
+  height: 560px;
   padding: 10px;
   overflow: auto;
   background: #ffffff;
   border: 1px solid #d7dde2;
   border-radius: 6px;
+  overscroll-behavior: contain;
 }
+
+.source-zoom-space { position: relative; }
+.source-zoom-space .image-stage { max-width: none; }
+.source-zoom-space .source-image { width: 100%; max-height: none; }
 
 .inspiration-workspace {
   min-height: 0;
@@ -490,7 +505,7 @@ h2 {
 }
 
 .canvas-name-input {
-  width: 100%;
+  max-width: 100%;
   min-width: 0;
   border: 1px solid #b9c0c7;
   border-radius: 6px;

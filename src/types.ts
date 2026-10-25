@@ -40,6 +40,7 @@ export interface Fragment {
   ocrText?: string;
   ocrStatus: OcrStatus;
   boxId: string;
+  boxIds?: string[];
   isFavorite: boolean;
 }
 
