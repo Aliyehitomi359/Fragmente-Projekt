@@ -1,11 +1,27 @@
-const { app, BrowserWindow, dialog } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain } = require('electron');
+const { createLibrary } = require('./library.cjs');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 
-app.setName('Fragmente-Projekt');
+const isDevelopment = !app.isPackaged && process.env.FRAGMENTE_DESKTOP_DEV === '1';
+app.setName(isDevelopment ? 'Fragmente-Projekt Development' : 'Fragmente-Projekt');
+if (isDevelopment) {
+  app.setPath('userData', path.join(app.getPath('appData'), 'Fragmente-Projekt-Development'));
+}
 let mainWindow;
+let library;
 
 async function chooseLibrary() {
+  if (isDevelopment) {
+    const root = path.join(app.getPath('desktop'), 'Fragmente-Projekt Preview Library');
+    const browserData = path.join(app.getPath('userData'), 'browser-data');
+    await fs.mkdir(browserData, { recursive: true });
+    await fs.mkdir(path.join(browserData, 'Cache', 'Cache_Data'), { recursive: true });
+    await fs.mkdir(path.join(browserData, 'Shared Dictionary', 'cache'), { recursive: true });
+    app.setPath('sessionData', browserData);
+    library = await createLibrary(root);
+    return true;
+  }
   const configPath = path.join(app.getPath('userData'), 'library-location.json');
   let libraryPath;
   try {
@@ -39,19 +55,25 @@ async function chooseLibrary() {
   const browserData = path.join(libraryPath, 'browser-data');
   await fs.mkdir(browserData, { recursive: true });
   app.setPath('sessionData', browserData);
+  library = await createLibrary(libraryPath);
   return true;
 }
 
 function openWindow() {
   mainWindow = new BrowserWindow({
     width: 1440, height: 940, minWidth: 1080, minHeight: 700,
-    title: 'Fragmente-Projekt',
-    webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true },
+    title: isDevelopment ? 'Fragmente-Projekt · Development' : 'Fragmente-Projekt',
+    webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true },
   });
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   mainWindow.webContents.on('will-navigate', (event) => event.preventDefault());
   mainWindow.webContents.on('will-prevent-unload', (event) => event.preventDefault());
-  mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+  if (isDevelopment) {
+    mainWindow.on('page-title-updated', (event) => event.preventDefault());
+    mainWindow.loadURL('http://localhost:5175/');
+  } else {
+    mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+  }
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
@@ -63,6 +85,12 @@ if (!app.requestSingleInstanceLock()) {
   });
   app.whenReady().then(async () => {
     if (!(await chooseLibrary())) { app.quit(); return; }
+    for (const method of ['scan', 'read', 'confirm', 'store', 'openFolder', 'reclassify']) {
+      ipcMain.handle(`library:${method}`, (event, ...args) => {
+        if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) throw new Error('Untrusted sender');
+        return library[method](...args);
+      });
+    }
     openWindow();
     app.on('activate', () => { if (!mainWindow) openWindow(); });
   }).catch((error) => {

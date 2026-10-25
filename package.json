@@ -10,6 +10,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "desktop": "npm run build && electron .",
+    "desktop:dev": "node scripts/desktop-dev.mjs",
     "package:mac": "npm run build && electron-builder --mac dmg zip",
     "package:win": "npm run build && electron-builder --win nsis"
   },

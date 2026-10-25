@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type PointerEvent } from 'react';
 import * as htmlToImage from 'html-to-image';
 import Tesseract from 'tesseract.js';
+import { FolderImports } from './FolderImports';
 import {
   DEFAULT_BOX_ID,
+  convertLibraryImage,
   loadAllData,
   nowIso,
   saveBox,
@@ -1135,7 +1137,10 @@ function SourcePanel({
         {visibleSources.length === 0 && <div className="empty-library">No sources found.</div>}
         {pageSources.map((source) => (
           <div key={source.id} className={`source-row ${source.id === selectedSourceId ? 'selected' : ''}`}>
-            <button className="source-select" onClick={() => onSelect(source.id)} onDoubleClick={() => onOpenSource(source.id)}>
+            <button className="source-select" draggable onDragStart={(event) => {
+              event.dataTransfer.setData('application/x-fragmente-source', source.id);
+              event.dataTransfer.effectAllowed = 'move';
+            }} onClick={() => onSelect(source.id)} onDoubleClick={() => onOpenSource(source.id)}>
               <BlobImage blob={source.imageBlob} alt="" className="source-thumb" />
               <span>
                 <strong>{source.name}</strong>
@@ -2734,7 +2739,10 @@ function FragmentLibrary({
               alt="Fragment"
               className="fragment-preview"
               draggable
-              onDragStart={(event) => event.dataTransfer.setData('text/plain', fragment.id)}
+              onDragStart={(event) => {
+                event.dataTransfer.setData('text/plain', fragment.id);
+                event.dataTransfer.setData('application/x-fragmente-fragment', fragment.id);
+              }}
             />
             <div className="ocr-row">
               <button
@@ -2783,25 +2791,17 @@ function FragmentLibrary({
 
 function LibraryBackup({
   status,
-  sources,
-  fragments,
   onDismissStatus,
   onExport,
   onImport,
-  onRunSourceOcr,
-  onRunFragmentOcr,
 }: {
   status: string;
-  sources: SourcePage[];
-  fragments: Fragment[];
   onDismissStatus: () => void;
   onExport: () => Promise<void>;
   onImport: () => Promise<void>;
-  onRunSourceOcr: (source: SourcePage) => void;
-  onRunFragmentOcr: (fragment: Fragment) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [isOcrOpen, setIsOcrOpen] = useState(false);
+  const [folderError, setFolderError] = useState('');
 
   return (
     <div className="library-backup">
@@ -2810,40 +2810,19 @@ function LibraryBackup({
       </button>
       {isOpen && (
         <div className="tools-panel">
-          <h2>Local backup</h2>
           <div className="backup-actions">
-            <button onClick={() => void onExport()}>Export / update library</button>
-            <button onClick={() => void onImport()}>Import library</button>
-            <button onClick={() => setIsOcrOpen((current) => !current)}>Run OCR manually</button>
+            {window.desktopLibrary && <button onClick={async () => {
+              try { await window.desktopLibrary!.openFolder(); setFolderError(''); }
+              catch (failure) { setFolderError(String(failure)); }
+            }}>Open Library Folder</button>}
+            <button title="Save a backup to a separate folder. Choose where the backup will be written." onClick={() => void onExport()}>{window.desktopLibrary ? 'Back Up Library...' : 'Export / update library'}</button>
+            <button title="Load an existing backup folder containing manifest.json. Matching items will be updated; other items remain." onClick={() => void onImport()}>{window.desktopLibrary ? 'Restore Library...' : 'Import library'}</button>
           </div>
-          <p>
+          {folderError && <p role="alert">{folderError}</p>}
+          {!window.desktopLibrary && <p>
             To update, choose the same library folder you exported before. Export updates <code>manifest.json</code>,{' '}
             <code>sources</code>, <code>fragments</code>, and <code>canvases</code>.
-          </p>
-          {isOcrOpen && (
-            <div className="manual-ocr-panel">
-              <h3>Sources</h3>
-              <div className="manual-ocr-list">
-                {sources.length === 0 && <span>No sources yet.</span>}
-                {sources.map((source) => (
-                  <button key={source.id} onClick={() => onRunSourceOcr(source)}>
-                    <strong>{source.name}</strong>
-                    <span>{source.ocrStatus === 'processing' ? 'OCR processing...' : 'Run source OCR'}</span>
-                  </button>
-                ))}
-              </div>
-              <h3>Fragments</h3>
-              <div className="manual-ocr-list">
-                {fragments.length === 0 && <span>No fragments yet.</span>}
-                {fragments.map((fragment) => (
-                  <button key={fragment.id} onClick={() => onRunFragmentOcr(fragment)}>
-                    <strong>{fragment.ocrText || fragment.sourceType}</strong>
-                    <span>{fragment.ocrStatus === 'processing' ? 'OCR processing...' : 'Run fragment OCR'}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          </p>}
         </div>
       )}
       {status && (
@@ -2865,6 +2844,7 @@ export default function App() {
   const [backupStatus, setBackupStatus] = useState('');
   const [libraryNotice, setLibraryNotice] = useState('');
   const [draftNotice, setDraftNotice] = useState('');
+  const [transferNotice, setTransferNotice] = useState('');
   const [workspaceMode, setWorkspaceMode] = useState<'cut' | 'inspiration' | 'canvas-setup' | 'canvas'>('cut');
   const [inspirationFragmentIds, setInspirationFragmentIds] = useState<string[]>([]);
 
@@ -3473,14 +3453,38 @@ export default function App() {
   }
 
   return (
-    <main className="app-shell">
+    <main className="app-shell" onDragOverCapture={(event) => {
+      const node = event.target as HTMLElement;
+      const target = node.closest('.left-panel') ? 'source' : node.closest('.right-stack') ? 'fragment' : null;
+      if (target && event.dataTransfer.types.includes(`application/x-fragmente-${target === 'source' ? 'fragment' : 'source'}`)) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.dataTransfer.dropEffect = 'move';
+      }
+    }} onDropCapture={(event) => {
+      const node = event.target as HTMLElement;
+      const target = node.closest('.left-panel') ? 'source' : node.closest('.right-stack') ? 'fragment' : null;
+      if (!target) return;
+      const id = event.dataTransfer.getData(`application/x-fragmente-${target === 'source' ? 'fragment' : 'source'}`);
+      if (!id) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (target === 'source' && data.canvases.some((canvas) => canvas.placements.some((placement) => placement.fragmentId === id)) && !window.confirm('Convert to Source? This removes this fragment from canvas layouts.')) return;
+      if (target === 'fragment' && data.sources.find((source) => source.id === id)?.cutRegions.length && !window.confirm('Convert to Fragment? Existing cropped fragments will remain, but their source links and cut marks will be removed.')) return;
+      void convertLibraryImage(id, target).then(async () => {
+        await refresh();
+        if (target === 'source') { setSelectedSourceId(id); setWorkspaceMode('cut'); }
+        else { setActiveBoxId(DEFAULT_BOX_ID); setWorkspaceMode('cut'); }
+        setTransferNotice(target === 'source' ? 'Moved to Sources.' : 'Moved to Fragments.');
+      }).catch((failure) => setError(String(failure)));
+    }}>
       <SourcePanel
         sources={data.sources}
         selectedSourceId={selectedSource?.id}
         canvases={data.canvases}
         selectedCanvasId={selectedCanvas?.id}
         notice={draftNotice}
-        onUpload={(files) => void uploadSources(files)}
+        onUpload={(files) => void uploadSources(files).catch((failure) => setError(`Upload could not be saved to the library: ${String(failure)}`))}
         onSelect={setSelectedSourceId}
         onOpenSource={(sourceId) => {
           setSelectedSourceId(sourceId);
@@ -3494,6 +3498,11 @@ export default function App() {
         onDismissNotice={() => setDraftNotice('')}
       />
       <section className="center-panel">
+        {transferNotice && <div className="transfer-notice" role="status">
+          <span>{transferNotice}</span>
+          <button onClick={() => setTransferNotice('')} aria-label="Dismiss notification">Dismiss</button>
+        </div>}
+        <FolderImports onImported={refresh} onFragment={(fragment) => void autoRecognizeFragment(fragment)} />
         {error && <div className="error-banner">{error}</div>}
         <div className="workspace-switch">
           <button className={workspaceMode === 'cut' ? 'selected' : ''} onClick={() => setWorkspaceMode('cut')}>
@@ -3550,17 +3559,13 @@ export default function App() {
         <UploadDropzone
           label="Upload fragments"
           hint="Already have cropped word images? Add them directly here"
-          onFiles={(files) => void uploadFragments(files)}
+          onFiles={(files) => void uploadFragments(files).catch((failure) => setError(`Upload could not be saved to the library: ${String(failure)}`))}
         />
         <LibraryBackup
           status={backupStatus}
-          sources={data.sources}
-          fragments={data.fragments}
           onDismissStatus={() => setBackupStatus('')}
           onExport={exportLibrary}
           onImport={importLibrary}
-          onRunSourceOcr={(source) => void autoRecognizeSource(source)}
-          onRunFragmentOcr={(fragment) => void autoRecognizeFragment(fragment)}
         />
         {workspaceMode === 'inspiration' ? (
           <InspirationSessionPanel

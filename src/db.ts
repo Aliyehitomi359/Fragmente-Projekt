@@ -122,9 +122,12 @@ export async function loadAllData() {
   };
 }
 
-export async function saveSource(source: SourcePage) {
+export async function saveSource(source: SourcePage, syncFile = true) {
   const db = await dbPromise;
   await db.put('sources', source);
+  if (window.desktopLibrary && syncFile) {
+    await window.desktopLibrary.store('source', source.id, source.imageBlob.type, new Uint8Array(await source.imageBlob.arrayBuffer()), source.nameEdited ? source.name : source.ocrText || source.name);
+  }
 }
 
 export async function deleteSource(sourceId: string) {
@@ -132,9 +135,12 @@ export async function deleteSource(sourceId: string) {
   await db.delete('sources', sourceId);
 }
 
-export async function saveFragment(fragment: Fragment) {
+export async function saveFragment(fragment: Fragment, syncFile = true) {
   const db = await dbPromise;
   await db.put('fragments', fragment);
+  if (window.desktopLibrary && syncFile) {
+    await window.desktopLibrary.store('fragment', fragment.id, fragment.imageBlob.type, new Uint8Array(await fragment.imageBlob.arrayBuffer()), fragment.ocrText || (fragment.imageBlob instanceof File ? fragment.imageBlob.name : ''));
+  }
 }
 
 export async function deleteFragment(fragmentId: string) {
@@ -155,4 +161,38 @@ export async function saveCanvas(canvas: CollageCanvas) {
 export async function deleteCanvas(canvasId: string) {
   const db = await dbPromise;
   await db.delete('canvases', canvasId);
+}
+
+export async function convertLibraryImage(id: string, target: 'source' | 'fragment') {
+  const db = await dbPromise;
+  const original = target === 'source' ? await db.get('fragments', id) : await db.get('sources', id);
+  if (!original) throw new Error('Image no longer exists.');
+  if (window.desktopLibrary) await window.desktopLibrary.reclassify(target, original.imageBlob.type, new Uint8Array(await original.imageBlob.arrayBuffer()));
+  const tx = db.transaction(['sources', 'fragments', 'canvases'], 'readwrite');
+  if (target === 'source') {
+    const fragment = original as Fragment;
+    await tx.objectStore('sources').put({ id, name: fragment.ocrText?.slice(0, 20) || 'Converted source', imageBlob: fragment.imageBlob, createdAt: fragment.createdAt, ocrText: fragment.ocrText, ocrStatus: fragment.ocrStatus, isFavorite: fragment.isFavorite, cutRegions: [] });
+    await tx.objectStore('fragments').delete(id);
+    for (const source of await tx.objectStore('sources').getAll()) {
+      await tx.objectStore('sources').put({ ...source, cutRegions: source.cutRegions.filter((region) => region.fragmentId !== id) });
+    }
+    for (const canvas of await tx.objectStore('canvases').getAll()) {
+      await tx.objectStore('canvases').put({ ...canvas, placements: canvas.placements.filter((placement) => placement.fragmentId !== id) });
+    }
+  } else {
+    const source = original as SourcePage;
+    await tx.objectStore('fragments').put({ id, imageBlob: source.imageBlob, createdAt: source.createdAt, updatedAt: nowIso(), ocrText: source.ocrText, ocrStatus: source.ocrStatus ?? 'idle', isFavorite: source.isFavorite ?? false, sourceType: 'direct-upload', boxId: DEFAULT_BOX_ID });
+    await tx.objectStore('sources').delete(id);
+    for (const fragment of await tx.objectStore('fragments').getAll()) {
+      if (fragment.sourcePageId === id) await tx.objectStore('fragments').put({ ...fragment, sourcePageId: undefined, cutRegionId: undefined });
+    }
+  }
+  await tx.done;
+  if (target === 'source') {
+    const source = await db.get('sources', id);
+    if (source) await saveSource(source);
+  } else {
+    const fragment = await db.get('fragments', id);
+    if (fragment) await saveFragment(fragment);
+  }
 }

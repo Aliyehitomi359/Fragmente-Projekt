@@ -1,0 +1,54 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs/promises');
+const os = require('node:os');
+const path = require('node:path');
+const { createLibrary } = require('./library.cjs');
+
+test('root images stay unclassified until confirmed, survive restart and are not reimported', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'fragmente-library-'));
+  try {
+    const library = await createLibrary(root);
+    await fs.writeFile(path.join(root, 'page.png'), Buffer.from('test-image'));
+    assert.equal((await library.scan()).length, 0);
+    const [candidate] = await library.scan();
+    assert.equal(candidate.kind, null);
+    await fs.access(path.join(root, 'page.png'));
+    await library.read(candidate.id);
+    await library.confirm(candidate.id, 'source');
+    await assert.rejects(fs.access(path.join(root, 'page.png')));
+    assert.equal((await fs.readdir(path.join(root, 'Sources'))).length, 1);
+    const reopened = await createLibrary(root);
+    await reopened.scan();
+    assert.equal((await reopened.scan()).length, 0);
+    await reopened.store('fragment', 'image-one', 'image/png', new Uint8Array([1, 2, 3]));
+    await reopened.scan();
+    assert.equal((await reopened.scan()).length, 0);
+    await reopened.reclassify('source', 'image/png', new Uint8Array([1, 2, 3]));
+    assert.equal((await fs.readdir(path.join(root, 'Fragments'))).length, 0);
+    await reopened.scan();
+    assert.equal((await reopened.scan()).length, 0);
+    await reopened.store('source', 'image-one', 'image/png', new Uint8Array([1, 2, 3]), '诗 / 中文: Poetry');
+    let named = (await fs.readdir(path.join(root, 'Sources'))).filter((name) => name.startsWith('诗'));
+    assert.equal(named.length, 1);
+    assert.ok(!named[0].includes(':'));
+    await reopened.store('source', 'image-one', 'image/png', new Uint8Array([1, 2, 3]), 'Corrected text');
+    assert.equal((await fs.readdir(path.join(root, 'Sources'))).filter((name) => name.startsWith('诗')).length, 0);
+    assert.equal((await fs.readdir(path.join(root, 'Sources'))).filter((name) => name.startsWith('Corrected text')).length, 1);
+    const firstName = (await fs.readdir(path.join(root, 'Sources'))).find((name) => /^Corrected text-[A-Z0-9]{3}\.png$/.test(name));
+    assert.ok(firstName);
+    await reopened.store('source', 'image-two', 'image/png', new Uint8Array([4, 5, 6]), 'Corrected text');
+    const secondName = (await fs.readdir(path.join(root, 'Sources'))).find((name) => name.startsWith('Corrected text-') && name !== firstName);
+    assert.ok(/^Corrected text-[A-Z0-9]{3}\.png$/.test(secondName));
+    assert.deepEqual([...await fs.readFile(path.join(root, 'Sources', firstName))], [1, 2, 3]);
+    assert.deepEqual([...await fs.readFile(path.join(root, 'Sources', secondName))], [4, 5, 6]);
+    const renamed = await createLibrary(root);
+    await renamed.scan();
+    assert.equal((await renamed.scan()).length, 0);
+    await assert.rejects(reopened.store('source', '../escape', 'image/png', new Uint8Array([1])));
+    await fs.writeFile(path.join(root, 'Fragments', 'outside.jpg'), Buffer.from('external-image'));
+    await reopened.scan();
+    const [external] = await reopened.scan();
+    assert.equal(external.kind, 'fragment');
+  } finally { await fs.rm(root, { recursive: true, force: true }); }
+});

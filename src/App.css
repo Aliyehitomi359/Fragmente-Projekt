@@ -4,6 +4,23 @@
   box-sizing: border-box;
 }
 
+.folder-imports { padding: 10px; background: #ecfdf3; border: 1px solid #b7e4c7; }
+.folder-imports > div { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.folder-imports span { flex: 1; overflow-wrap: anywhere; min-width: 0; }
+.folder-imports button { padding: 4px 6px; font-size: 12px; }
+.transfer-notice { display: flex; align-items: center; gap: 12px; padding: 8px 10px; color: #24513d; background: #ecfdf3; border: 1px solid #b7e4c7; border-radius: 6px; font-size: 13px; }
+.transfer-notice span { flex: 1; }
+.transfer-notice button { padding: 4px 6px; font-size: 11px; }
+.folder-classification-dialog { width: min(620px, calc(100vw - 40px)); max-height: 85vh; overflow: auto; padding: 20px; border: 1px solid #b9c0c7; border-radius: 8px; color: #1d1d1f; }
+.folder-classification-dialog::backdrop { background: rgba(0, 0, 0, 0.35); }
+.classification-header { display: flex; align-items: center; gap: 12px; }
+.classification-header h2 { margin: 0; flex: 1; }
+.classification-row { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-top: 1px solid #d7dde2; }
+.folder-file-preview { position: relative; flex: 1; min-width: 0; }
+.folder-file-name { width: 100%; text-align: left; overflow-wrap: anywhere; border: 0; background: transparent; padding: 6px 0; }
+.folder-preview-popup { position: relative; margin-top: 6px; padding: 8px; background: #f2f4f7; border: 1px solid #b9c0c7; border-radius: 6px; }
+.folder-preview-popup img { display: block; width: 100%; max-height: 240px; object-fit: contain; }
+
 html,
 body,
 #root {
