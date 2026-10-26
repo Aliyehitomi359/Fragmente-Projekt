@@ -85,6 +85,9 @@ button.selected, .workspace-switch button.selected,
 }
 .dropzone.active { background: var(--cyan); border-color: #638373; }
 .dropzone span { color: #253c32; font-size: 12px; line-height: 1.4; }
+.dropzone { min-height: 150px; height: 150px; }
+.image-add-actions { display: flex; gap: 6px; margin-top: 3px; }
+.image-add-actions button { font-size: 11px; padding: 4px 8px; }
 .center-panel { background: var(--paper); min-height: 0; height: 100%; }
 .workspace-switch {
   background: #af3724;
@@ -169,6 +172,15 @@ button.selected, .workspace-switch button.selected,
   border-radius: 0;
 }
 .danger-button, .source-menu-delete { color: var(--wine); }
+.clipboard-dialog { width: min(480px, calc(100vw - 32px)); max-height: 85vh; overflow: auto; background: var(--card-paper); color: var(--ink); border: 1px solid var(--ink); padding: 16px; }
+.clipboard-dialog::backdrop { background: #0007; }
+.clipboard-dialog-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+.clipboard-dialog-head h2 { margin: 0; }
+.clipboard-dialog-head button { width: 28px; height: 28px; padding: 0; }
+.clipboard-preview { display: block; width: 100%; height: 220px; object-fit: contain; background: var(--worktop); }
+.clipboard-destinations { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.clipboard-dialog [role=alert] { color: var(--wine); }
+.clipboard-paste-notice { position: fixed; top: 66px; left: 50%; transform: translateX(-50%); z-index: 120; display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 32px); padding: 10px; background: var(--card-paper); color: var(--wine); border: 1px solid var(--wine); box-shadow: 2px 3px #0003; }
 .box-name-edit { width: 80px; min-width: 0; height: 27px; padding: 4px 5px; font-size: 12px; background: var(--button-paper); border: 1px solid var(--wine); }
 .box-row { flex-wrap: wrap; }
 .tools-panel { position: fixed; top: 98px; right: 14px; width: min(302px, calc(100vw - 28px)); max-height: calc(100dvh - 112px); overflow-y: auto; z-index: 100; }

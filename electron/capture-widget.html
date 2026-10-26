@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'"><title>Fragmente Capture</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:transparent;color:#252b28;font:12px monospace}button{font:inherit;cursor:pointer}.orb{position:absolute;bottom:12px;right:12px;width:54px;height:54px;border-radius:50%;background:#611412;color:#f7eade;border:1px solid #252b28;box-shadow:2px 3px 0 #0004;font:30px Georgia;cursor:pointer}.handle{position:absolute;bottom:0;left:0;width:100%;height:12px;-webkit-app-region:drag}.menu{position:absolute;bottom:76px;right:12px;width:180px;background:#f7f4eb;border:1px solid #252b28;padding:7px;box-shadow:2px 3px #0004}.menu[hidden]{display:none}.menu button{width:100%;text-align:left;padding:7px 5px;border:0;background:transparent;color:#252b28}.menu button:hover{background:#b0d5c5}.foot{display:flex;border-top:1px solid #b9b5ac}.foot button{font-size:10px}.status{position:absolute;inset:4px 8px auto;background:#def0df;padding:8px;border:1px solid #8fb8a8;line-height:1.4;overflow-wrap:anywhere;z-index:3}.status[hidden]{display:none}.status.error{background:#fff1f1;border-color:#a11414}.status button{float:right;background:none;border:0}
+</style></head><body>
+<div class="status" id="status" role="status" hidden><button id="dismiss" aria-label="Dismiss">×</button><span></span></div>
+<div class="menu" id="menu" hidden><button data-kind="fragment">✂ Capture fragment</button><button data-kind="source">▣ Capture full screen</button><div class="foot"><button id="open">Open app</button><button id="quit">Quit</button></div></div>
+<button class="orb" id="orb" aria-label="Screenshot options" aria-expanded="false" title="Capture a fragment or full screen">f.</button><div class="handle" title="Drag to move"></div>
+<script>
+const menu=document.querySelector('#menu'),orb=document.querySelector('#orb'),status=document.querySelector('#status');let timer;
+function collapse(){menu.hidden=true;orb.setAttribute('aria-expanded','false');if(status.hidden)window.captureUI.action('expand',false)}
+function expand(){status.hidden=true;menu.hidden=false;orb.setAttribute('aria-expanded','true');window.captureUI.action('expand',true)}
+orb.onmouseenter=()=>{timer=setTimeout(expand,550)};orb.onmouseleave=()=>clearTimeout(timer);
+let drag,moved=false;
+orb.onpointerdown=e=>{if(e.button!==0)return;clearTimeout(timer);moved=false;drag={x:e.screenX,y:e.screenY,wx:window.screenX,wy:window.screenY};orb.setPointerCapture(e.pointerId)};
+orb.onpointermove=e=>{if(!drag)return;const dx=e.screenX-drag.x,dy=e.screenY-drag.y;if(Math.abs(dx)+Math.abs(dy)>5)moved=true;if(moved)window.captureUI.action('move',{x:drag.wx+dx,y:drag.wy+dy})};
+orb.onpointerup=()=>drag=null;orb.onpointercancel=()=>drag=null;
+orb.onclick=()=>{if(moved){moved=false;return}menu.hidden?expand():collapse()};
+document.querySelectorAll('[data-kind]').forEach(button=>button.onclick=()=>{menu.hidden=true;status.hidden=true;collapse();window.captureUI.action('start',button.dataset.kind)});
+document.querySelector('#open').onclick=()=>{collapse();window.captureUI.action('open')};document.querySelector('#quit').onclick=()=>window.captureUI.action('quit');document.querySelector('#dismiss').onclick=()=>{status.hidden=true;collapse()};
+window.captureUI.onState(state=>{status.hidden=false;status.classList.toggle('error',!!state.error);status.querySelector('span').textContent=state.text;});
+document.onkeydown=event=>{if(event.key==='Escape'){status.hidden=true;collapse()}};
+</script></body></html>

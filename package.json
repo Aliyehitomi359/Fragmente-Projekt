@@ -40,9 +40,11 @@
   "dependencies": {
     "html-to-image": "latest",
     "idb": "latest",
+    "pngjs": "^7.0.0",
     "react": "latest",
     "react-dom": "latest",
-    "tesseract.js": "latest"
+    "tesseract.js": "latest",
+    "utif": "^3.1.0"
   },
   "devDependencies": {
     "@types/react": "^19.2.14",

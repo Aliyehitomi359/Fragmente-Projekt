@@ -140,7 +140,7 @@ export async function saveFragment(fragment: Fragment, syncFile = true) {
   const db = await dbPromise;
   await db.put('fragments', withFragmentBoxes(fragment, fragmentBoxIds(fragment)));
   if (window.desktopLibrary && syncFile) {
-    await window.desktopLibrary.store('fragment', fragment.id, fragment.imageBlob.type, new Uint8Array(await fragment.imageBlob.arrayBuffer()), fragment.ocrText || (fragment.imageBlob instanceof File ? fragment.imageBlob.name : ''));
+    await window.desktopLibrary.store('fragment', fragment.id, fragment.imageBlob.type, new Uint8Array(await fragment.imageBlob.arrayBuffer()), fragment.captureName || fragment.ocrText || (fragment.imageBlob instanceof File ? fragment.imageBlob.name : ''));
   }
 }
 

@@ -88,7 +88,7 @@ export function FolderImports({ onImported, onFragment }: {
           }
           for (const fragment of saved.fragments) {
             if (stopped) return;
-            await window.desktopLibrary!.store('fragment', fragment.id, fragment.imageBlob.type, new Uint8Array(await fragment.imageBlob.arrayBuffer()), fragment.ocrText || (fragment.imageBlob instanceof File ? fragment.imageBlob.name : ''));
+            await window.desktopLibrary!.store('fragment', fragment.id, fragment.imageBlob.type, new Uint8Array(await fragment.imageBlob.arrayBuffer()), fragment.captureName || fragment.ocrText || (fragment.imageBlob instanceof File ? fragment.imageBlob.name : ''));
           }
           filenamesSynced.current = true;
         }

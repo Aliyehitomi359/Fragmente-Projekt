@@ -31,6 +31,7 @@ export interface SourcePage {
 
 export interface Fragment {
   id: string;
+  captureName?: string;
   imageBlob: Blob;
   createdAt: string;
   updatedAt: string;

@@ -3,6 +3,7 @@ import { fragmentBoxIds, withFragmentBoxes } from './boxMembership';
 import * as htmlToImage from 'html-to-image';
 import Tesseract from 'tesseract.js';
 import { FolderImports } from './FolderImports';
+import { ClipboardImport } from './ClipboardImport';
 import {
   DEFAULT_BOX_ID,
   convertLibraryImage,
@@ -896,10 +897,12 @@ function UploadDropzone({
   return (
     <div
       className={`dropzone ${active ? 'active' : ''}`}
-      role="button"
+      role="group"
+      aria-label={label}
       tabIndex={0}
       onClick={() => inputRef.current?.click()}
       onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
         if (event.key === 'Enter' || event.key === ' ') {
           inputRef.current?.click();
         }
@@ -917,6 +920,13 @@ function UploadDropzone({
     >
       <strong>{label}</strong>
       <span>{hint}</span>
+      <div className="image-add-actions">
+        <button type="button" onClick={(event) => { event.stopPropagation(); inputRef.current?.click(); }}>Upload</button>
+        <button type="button" onClick={(event) => {
+          event.stopPropagation();
+          document.dispatchEvent(new CustomEvent('fragmente:paste-image', { detail: label.toLowerCase().includes('fragment') ? 'fragment' : 'source' }));
+        }}>Paste</button>
+      </div>
       <input
         ref={inputRef}
         type="file"
@@ -1021,7 +1031,7 @@ function SourcePanel({
         <span className="collection-emoji" aria-hidden="true">📖</span><span>{sources.length}</span>
       </div>
       <UploadDropzone
-        label="Upload sources"
+        label="Add sources"
         hint="Add images here, then cut specific words in the center workspace"
         onFiles={onUpload}
       />
@@ -2894,6 +2904,40 @@ export default function App() {
   const selectedCanvas = data?.canvases.find((canvas) => canvas.id === selectedCanvasId) ?? data?.canvases[0];
 
   useEffect(() => {
+    const api = window.desktopLibrary;
+    if (!data || !api) return;
+    return api.onCapture((payload) => {
+      void (async () => {
+        try {
+          const imageBlob = new Blob([new Uint8Array(payload.bytes)], { type: 'image/png' });
+          const createdAt = nowIso();
+          const current = await loadAllData();
+          let capturedFragment: Fragment | undefined;
+          if (payload.kind === 'source') {
+            await saveSource(current.sources.find((item) => item.id === payload.id) ?? {
+              id: payload.id, name: payload.name, nameEdited: true, originalFileName: payload.name, imageBlob, createdAt,
+              cutRegions: [], ocrStatus: 'idle', isFavorite: false,
+            });
+            setSelectedSourceId(payload.id);
+            setWorkspaceMode('cut');
+          } else {
+            capturedFragment = current.fragments.find((item) => item.id === payload.id) ?? {
+              id: payload.id, captureName: payload.name, imageBlob, createdAt, updatedAt: createdAt, sourceType: 'direct-upload',
+              ocrStatus: 'processing', boxId: DEFAULT_BOX_ID, boxIds: [DEFAULT_BOX_ID], isFavorite: false,
+            };
+            await saveFragment(capturedFragment);
+          }
+          await refresh();
+          await api.completeCapture(payload.id);
+          if (capturedFragment && capturedFragment.ocrStatus === 'processing') void autoRecognizeFragment(capturedFragment);
+        } catch (failure) {
+          await api.completeCapture(payload.id, `Capture could not be saved: ${String(failure)}`);
+        }
+      })();
+    });
+  }, [!!data]);
+
+  useEffect(() => {
     loadAllData()
       .then((loaded) => {
         setData(loaded);
@@ -2928,7 +2972,7 @@ export default function App() {
     setData(await loadAllData());
   }
 
-  async function uploadSources(files: File[]) {
+  async function uploadSources(files: File[], notifyOcr = true) {
     const createdAt = nowIso();
     const existingNames = new Set(data?.sources.map((source) => source.name) ?? []);
     const batchNames = new Set<string>();
@@ -2972,7 +3016,7 @@ export default function App() {
     setSelectedSourceId(loaded.sources[0]?.id);
     loaded.sources
       .filter((source) => acceptedFiles.some((file) => file.name === source.originalFileName) && source.ocrStatus === 'processing')
-      .forEach((source) => void autoRecognizeSource(source));
+      .forEach((source) => void autoRecognizeSource(source, notifyOcr));
   }
 
   async function removeSource(sourceId: string) {
@@ -3004,7 +3048,7 @@ export default function App() {
     );
   }
 
-  async function autoRecognizeSource(source: SourcePage) {
+  async function autoRecognizeSource(source: SourcePage, notify = true) {
     let worker: Awaited<ReturnType<typeof Tesseract.createWorker>> | undefined;
     const processingSource = { ...source, ocrStatus: 'processing' as const };
     await saveSource(processingSource);
@@ -3041,7 +3085,7 @@ export default function App() {
             }
           : current,
       );
-      setDraftNotice(`Source OCR recognized: ${ocrName || 'No text found. You can edit the source name manually.'}`);
+      if (notify) setDraftNotice(`Source OCR recognized: ${ocrName || 'No text found. You can edit the source name manually.'}`);
     } catch {
       const updatedSource: SourcePage = { ...source, ocrStatus: 'error' };
       await saveSource(updatedSource);
@@ -3053,7 +3097,7 @@ export default function App() {
             }
           : current,
       );
-      setDraftNotice('Source OCR failed. You can edit the source name manually.');
+      if (notify) setDraftNotice('Source OCR failed. You can edit the source name manually.');
     } finally {
       await worker?.terminate();
     }
@@ -3527,6 +3571,11 @@ export default function App() {
       }).catch((failure) => setError(String(failure)));
     }}>
       <header className="app-brand-header"><div className="brand-title">Fragmente-Projekt</div></header>
+      <ClipboardImport onImport={async (files, target) => {
+        if (target === 'source') { setDraftNotice(''); await uploadSources(files, false); }
+        else await uploadFragments(files);
+        setTransferNotice(`${files.length} clipboard image${files.length === 1 ? '' : 's'} added to ${target === 'source' ? 'Sources' : 'Fragments'}.`);
+      }} />
       <SourcePanel
         sources={data.sources}
         selectedSourceId={selectedSource?.id}
@@ -3618,7 +3667,7 @@ export default function App() {
           <span className="collection-emoji" aria-hidden="true">🏷️</span><span>{data.fragments.length}</span>
         </div>
         <UploadDropzone
-          label="Upload fragments"
+          label="Add fragments"
           hint="Already have cropped word images? Add them directly here"
           onFiles={(files) => void uploadFragments(files).catch((failure) => setError(`Upload could not be saved to the library: ${String(failure)}`))}
         />
