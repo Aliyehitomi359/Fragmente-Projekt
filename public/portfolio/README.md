@@ -1,18 +1,20 @@
-# Fragmente-Projekt Portfolio Demo
+# Fragmente-Projekt: From Practice to Product
 
-- English: `index.html`
-- 中文：`zh.html`
-- Shared assets: `style.css`, `demo.js`, `capture-menu.png`
+Admission/recruiter-facing project story rebuilt around real product evidence.
 
-Open either HTML file directly, or use the existing Vite server at port 5175:
+- English: http://localhost:5175/portfolio/index.html
+- Chinese: http://localhost:5175/portfolio/zh.html
+- English sample library: http://localhost:5175/?demo=1&lang=en
+- Chinese sample library: http://localhost:5175/?demo=1&lang=zh
 
-- http://localhost:5175/portfolio/index.html
-- http://localhost:5175/portfolio/zh.html
+`story.js` contains corresponding bilingual copy and a keyboard-accessible screenshot gallery. Active screenshots are `real-*-en.png` and `real-*-zh.png`, showing the full React app with the two user-supplied Dubliners / The Dead screenshots. Fragment images are actual crops of those source PNGs, not newly typeset text. `capture-menu.png` is a real desktop development screenshot. No video is included. The previous simulator (`demo.js`) and unsuffixed screenshots are no longer loaded.
 
-This is an isolated, in-memory guided sample, not the full app. It does not access IndexedDB, desktop IPC, screenshots, accounts, or the real library. Refresh resets the sample. Original example text is generated as bitmap images in the browser. The sample supports cropping, selecting/favoriting fragments, a temporary inspiration selection, moving collage fragments, and a 1200 × 900 PNG export.
+Each language uses its own `fragmente-dubliners-demo-v4-{en|zh}` database, separate from the regular `poem-collage-db` and the previous demo. Each seeds one source, six fragments, boxes and one archived composition once. Previous databases are not erased. Example OCR/search text is prefilled, not a claim that OCR ran during the demonstration. Edits persist across refresh. Actual OCR can require a language-model download. Desktop-only capture and file synchronization are not exposed in the browser demo.
 
-The desktop menu image is a real development screenshot. No workflow video is included; the page explicitly distinguishes implemented functionality from native flows still awaiting verification. Fonts use Google Fonts when online, with local fallback fonts.
+Source attribution: James Joyce, Dubliners, The Dead. The Chinese screenshot's translator/edition is not identified. Confirm translation permissions before public publication. No public deployment was performed.
 
-This folder can be served as a static site without a backend. It has not been published. Before sending a public portfolio link, review the role/AI contribution copy, finish native capture acceptance testing, and add a real workflow recording if desired. Do not link this demo to a personal library.
+Both desktop sections embed user-supplied recordings: `desktop-capture-zh.mp4` in Chinese and `desktop-capture-en.mp4` in English. Native playback, seeking and fullscreen controls and a download fallback are provided. Videos do not autoplay. They are stored with the site without an external video host. The simulated animation is no longer loaded. Review visible browser tabs and other personal details before public deployment.
 
-这是独立的作品集样例，不能替代完整 App。两种语言内容对应，页面顶部可切换。无需安装、上传文件或建立素材库；所有样例操作只留在当前页面内存，不改动真实项目数据。
+Run `npm run dev` at the project root (strict port 5175). To publish the working demo, deploy the full Vite build, not only this folder: app links point to `/?demo=1`. This has not been publicly deployed. Direct file opening is not the recommended workflow.
+
+Claims are intentionally bounded: personal/peer creative experience, product and visual direction, AI-assisted implementation, working MVP. No unverified adoption numbers, hours or production-readiness claims.

@@ -67,6 +67,8 @@ button.selected, .workspace-switch button.selected,
   font-size: 27px;
   font-weight: 400;
 }
+.demo-library-label { margin-left: auto; font-size: 11px; display: flex; gap: 18px; align-items: center; }
+.demo-library-label a { color: var(--warm-white); }
 .panel { background: var(--sidebar); border-color: var(--rule); }
 .left-panel, .right-stack { padding-top: 14px; min-height: 0; height: 100%; }
 .right-stack { gap: 14px; }

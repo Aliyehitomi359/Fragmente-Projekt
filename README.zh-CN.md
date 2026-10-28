@@ -1,5 +1,13 @@
 # Fragmente-Projekt
 
+## 在线体验
+
+**[打开中文 Demo](https://aliyehitomi359.github.io/Fragmente-Projekt/portfolio/zh.html)** · **[English Demo](https://aliyehitomi359.github.io/Fragmente-Projekt/)** · **[体验 App](https://aliyehitomi359.github.io/Fragmente-Projekt/?demo=1&lang=zh)**
+
+[![Fragmente-Projekt 拼贴创作界面](public/portfolio/real-canvas-zh.png)](https://aliyehitomi359.github.io/Fragmente-Projekt/portfolio/zh.html)
+
+包含真实桌面操作录屏、中英文项目介绍，以及独立示例素材库。无需安装或登录；系统级截图仍需桌面版。这是借助 AI 编程工具实现并持续迭代的 MVP。
+
 [English](README.md) | [简体中文](README.zh-CN.md)
 
 本地优先的文字碎片收集与拼贴诗创作工具。使用 React、TypeScript、Vite、IndexedDB 和 Electron，无需账号或后端。目前软件界面为英文，中文版将在英文版稳定后制作。

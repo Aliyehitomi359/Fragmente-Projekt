@@ -2,12 +2,15 @@ import { openDB, type DBSchema } from 'idb';
 import type { CollageCanvas, Fragment, FragmentBox, SourcePage } from './types';
 import { DEFAULT_BOX_ID, fragmentBoxIds, withFragmentBoxes } from './boxMembership';
 
-const DB_NAME = 'poem-collage-db';
+export const IS_DEMO = typeof window !== 'undefined' && new URLSearchParams(window.location?.search ?? '').get('demo') === '1';
+export const DEMO_LANGUAGE = typeof window !== 'undefined' && new URLSearchParams(window.location?.search ?? '').get('lang') === 'zh' ? 'zh' : 'en';
+const DB_NAME = IS_DEMO ? `fragmente-dubliners-demo-v4-${DEMO_LANGUAGE}` : 'poem-collage-db';
 const DB_VERSION = 1;
 export { DEFAULT_BOX_ID } from './boxMembership';
 export const DEFAULT_CANVAS_ID = 'main-canvas';
 
 interface PoemCollageDB extends DBSchema {
+  demoMeta: { key: string; value: boolean };
   sources: {
     key: string;
     value: SourcePage;
@@ -34,6 +37,7 @@ const dbPromise = openDB<PoemCollageDB>(DB_NAME, DB_VERSION, {
     fragmentStore.createIndex('by-box', 'boxId');
     db.createObjectStore('boxes', { keyPath: 'id' });
     db.createObjectStore('canvases', { keyPath: 'id' });
+    if (IS_DEMO) db.createObjectStore('demoMeta');
   },
 });
 
@@ -74,6 +78,7 @@ export async function ensureDefaults() {
 
 export async function loadAllData() {
   await ensureDefaults();
+  if (IS_DEMO) await (demoSeed ??= seedDemo());
   const db = await dbPromise;
   let [sources, fragments, boxes, canvases] = await Promise.all([
     db.getAll('sources'),
@@ -121,6 +126,23 @@ export async function loadAllData() {
     boxes: boxes.sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
     canvases: canvases.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
   };
+}
+
+let demoSeed: Promise<void> | undefined;
+async function seedDemo() {
+  const db = await dbPromise;
+  if (await db.get('demoMeta', 'seeded')) return;
+  const { createDemoData } = await import('./demoData');
+  const sample = await createDemoData(DEMO_LANGUAGE);
+  const tx = db.transaction(['sources', 'fragments', 'boxes', 'canvases', 'demoMeta'], 'readwrite');
+  if (!(await tx.objectStore('demoMeta').get('seeded'))) {
+    for (const source of sample.sources) await tx.objectStore('sources').put(source);
+    for (const fragment of sample.fragments) await tx.objectStore('fragments').put(fragment);
+    for (const box of sample.boxes) await tx.objectStore('boxes').put(box);
+    for (const canvas of sample.canvases) await tx.objectStore('canvases').put(canvas);
+    await tx.objectStore('demoMeta').put(true, 'seeded');
+  }
+  await tx.done;
 }
 
 export async function saveSource(source: SourcePage, syncFile = true) {

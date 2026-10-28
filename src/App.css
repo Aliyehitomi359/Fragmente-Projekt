@@ -141,6 +141,8 @@ h2 {
 .working-canvas-close { width: 26px; height: 30px; padding: 0; border: 0; background: transparent; font-size: 18px; line-height: 1; flex-shrink: 0; }
 .working-canvas-close:hover { background: #e5e7eb; }
 .zoom-control { position: relative; }
+.zoom-hint { display: flex; align-items: flex-start; gap: 8px; }
+.zoom-hint .zoom-hint-dismiss { flex: 0 0 22px; width: 22px; height: 22px; padding: 0; font-size: 18px; line-height: 1; }
 .zoom-hint { position: absolute; top: calc(100% + 6px); right: 0; width: 230px; padding: 8px 10px; border: 1px solid #b7e4c7; border-radius: 6px; color: #24513d; background: #ecfdf3; font-size: 12px; z-index: 12; }
 
 .workspace-switch button.selected {

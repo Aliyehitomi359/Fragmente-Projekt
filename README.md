@@ -2,6 +2,14 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
+## Try the Demo
+
+**[Open the live demo](https://aliyehitomi359.github.io/Fragmente-Projekt/)** · **[中文展示](https://aliyehitomi359.github.io/Fragmente-Projekt/portfolio/zh.html)** · **[Try the app](https://aliyehitomi359.github.io/Fragmente-Projekt/?demo=1&lang=en)**
+
+[![Fragmente-Projekt: collect words and compose collage poetry](public/portfolio/real-canvas-en.png)](https://aliyehitomi359.github.io/Fragmente-Projekt/)
+
+The bilingual project story includes actual desktop capture recordings and a full browser app with a separate sample library. No installation or login is required. Desktop screen capture itself requires the desktop build. This is an evolving MVP developed with AI coding assistance.
+
 A local-first workspace for collecting text from images and composing collage poems. Built with React, TypeScript, Vite, IndexedDB and Electron. No account or backend is required. The application interface is currently English; Chinese localization is planned.
 
 ## Features

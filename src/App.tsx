@@ -6,6 +6,7 @@ import { FolderImports } from './FolderImports';
 import { ClipboardImport } from './ClipboardImport';
 import {
   DEFAULT_BOX_ID,
+  IS_DEMO,
   convertLibraryImage,
   loadAllData,
   nowIso,
@@ -1343,7 +1344,7 @@ function SourceViewer({
       <div className="section-head">
         <h2>Source Viewer</h2>
         {source && <div className="zoom-control"><button title="Click to reset image size" onClick={() => { zoomRef.current = 1; setZoom(1); setShowZoomHint(false); viewerRef.current?.scrollTo(0, 0); }}>{Math.round(zoom * 100)}%</button>
-          {showZoomHint && <span className="zoom-hint" role="status">Click the percentage to reset image size.</span>}
+          {showZoomHint && <span className="zoom-hint" role="status"><span>Click the percentage to reset image size.</span><button className="zoom-hint-dismiss" aria-label="Dismiss zoom hint" title="Dismiss" onClick={() => setShowZoomHint(false)}>&#215;</button></span>}
         </div>}
       </div>
       <div
@@ -1457,7 +1458,9 @@ function SourceViewer({
                     className="selection-actions"
                     style={{
                       left: `${selection.x / imageSize.naturalWidth * 100}%`,
-                      top: `calc(${(selection.y + selection.height) / imageSize.naturalHeight * 100}% + 8px)`,
+                      top: `calc(${(selection.y + selection.height) / imageSize.naturalHeight * 100}% + ${8 / zoom}px)`,
+                      transform: `scale(${1 / zoom})`,
+                      transformOrigin: 'top left',
                     }}
                     onPointerDown={(event) => event.stopPropagation()}
                     onClick={(event) => event.stopPropagation()}
@@ -2964,6 +2967,7 @@ export default function App() {
       event.preventDefault();
       event.returnValue = 'Do not forget to export/update your local library backup.';
     };
+    if (IS_DEMO) return;
     window.addEventListener('beforeunload', remindToExport);
     return () => window.removeEventListener('beforeunload', remindToExport);
   }, []);
@@ -3570,7 +3574,7 @@ export default function App() {
         setTransferNotice(target === 'source' ? 'Moved to Sources.' : 'Moved to Fragments.');
       }).catch((failure) => setError(String(failure)));
     }}>
-      <header className="app-brand-header"><div className="brand-title">Fragmente-Projekt</div></header>
+      <header className="app-brand-header"><div className="brand-title">Fragmente-Projekt</div>{IS_DEMO && <span className="demo-library-label">Sample library <a href="./portfolio/index.html">Project story ↗</a></span>}</header>
       <ClipboardImport onImport={async (files, target) => {
         if (target === 'source') { setDraftNotice(''); await uploadSources(files, false); }
         else await uploadFragments(files);
