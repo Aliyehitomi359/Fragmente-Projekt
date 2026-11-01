@@ -27,6 +27,7 @@
     ],
     "asar": true,
     "mac": {
+      "icon": "build/icon.icns",
       "category": "public.app-category.graphics-design"
     },
     "win": {

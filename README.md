@@ -47,6 +47,8 @@ Builds currently have no distribution signing identity. These are development pr
 
 ## Storage and limitations
 
+Desktop Library settings includes **Open Library Folder**, the current path and **Move Library...**. Choose a parent folder (such as Desktop), then confirm. The installed app restarts; the development preview quits and completes the move on its next launch. After the old process exits, the complete library and Chromium editing database are copied and SHA-256 checked before the location is switched. The old folder is retained as a backup; new edits go only to the new folder. Existing destinations and nested locations are rejected. Do not manually move the active folder in Finder.
+
 Installed apps create Sources, Fragments, Canvases and .app-data inside the chosen library; browser-data still contains the editing database. Keep the entire library intact. Development preview uses a separate Desktop library and application profile as described above.
 
 Sources/Fragments hold image files; Canvases is currently reserved, not automatically populated with finished exports. Existing images are synchronized when the desktop interface starts. Inspiration sessions and table layouts are not yet restored after closing. OCR initially downloads language models and is not yet fully bundled for offline use.

@@ -2,6 +2,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('desktopLibrary', {
   readClipboardImage: () => ipcRenderer.invoke('clipboard:read-image'),
   openFolder: () => ipcRenderer.invoke('library:openFolder'),
+  getLocation: () => ipcRenderer.invoke('library:getLocation'),
+  moveLibrary: () => ipcRenderer.invoke('library:move'),
   reclassify: (kind, type, bytes) => ipcRenderer.invoke('library:reclassify', kind, type, bytes),
   scan: () => ipcRenderer.invoke('library:scan'),
   read: (id) => ipcRenderer.invoke('library:read', id),

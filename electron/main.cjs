@@ -2,6 +2,7 @@ const { app, BrowserWindow, dialog, ipcMain, clipboard, nativeImage } = require(
 const { readClipboardPng } = require('./clipboard-image.cjs');
 const { createLibrary } = require('./library.cjs');
 const { createCapture } = require('./capture.cjs');
+const { validateDestination, writeConfig, finishPendingMove } = require('./library-move.cjs');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 
@@ -15,6 +16,7 @@ let library;
 let capture;
 let quitting = false;
 let rendererReady = false;
+let movingLibrary = false;
 const pendingCaptures = new Map();
 
 function importCapture(payload) {
@@ -27,9 +29,26 @@ function importCapture(payload) {
 }
 
 async function chooseLibrary() {
+  const configPath = path.join(app.getPath('userData'), 'library-location.json');
+  let config = {};
+  try { config = JSON.parse(await fs.readFile(configPath, 'utf8')); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; }
+  if (config.pendingMove) {
+    try {
+      config = await finishPendingMove(configPath, config);
+      await dialog.showMessageBox({ type: 'info', title: 'Library moved', message: 'Your library is ready in its new location.',
+        detail: `${config.libraryPath}\n\nThe old folder has been kept as a backup. New changes will be saved only to the new location.`, buttons: ['Continue'] });
+    } catch (error) {
+      const { pendingMove, ...previous } = config;
+      config = previous;
+      await writeConfig(configPath, config);
+      dialog.showErrorBox('Library was not moved', `${error.message}\n\nThe app will reopen the original library. Nothing in the original library was deleted.`);
+    }
+  }
   if (isDevelopment) {
-    const root = path.join(app.getPath('desktop'), 'Fragmente-Projekt Preview Library');
-    const browserData = path.join(app.getPath('userData'), 'browser-data');
+    const root = config.libraryPath || path.join(app.getPath('desktop'), 'Fragmente-Projekt Preview Library');
+    if (config.libraryPath) await fs.access(path.join(root, '.fragmente-library.json'));
+    const browserData = config.browserDataPath || path.join(app.getPath('userData'), 'browser-data');
     await fs.mkdir(browserData, { recursive: true });
     await fs.mkdir(path.join(browserData, 'Cache', 'Cache_Data'), { recursive: true });
     await fs.mkdir(path.join(browserData, 'Shared Dictionary', 'cache'), { recursive: true });
@@ -37,10 +56,9 @@ async function chooseLibrary() {
     library = await createLibrary(root);
     return true;
   }
-  const configPath = path.join(app.getPath('userData'), 'library-location.json');
   let libraryPath;
   try {
-    libraryPath = JSON.parse(await fs.readFile(configPath, 'utf8')).libraryPath;
+    libraryPath = config.libraryPath;
     await fs.access(path.join(libraryPath, '.fragmente-library.json'));
   } catch (error) {
     if (libraryPath) {
@@ -74,8 +92,37 @@ async function chooseLibrary() {
   return true;
 }
 
+async function moveLibrary() {
+  if (movingLibrary) throw new Error('A library move is already in progress.');
+  movingLibrary = true;
+  try {
+    if (pendingCaptures.size) throw new Error('Finish saving your screenshot before moving the library.');
+    const sourceRoot = await library.getLocation();
+    const selection = await dialog.showOpenDialog(mainWindow, { title: 'Choose a new home for your library', properties: ['openDirectory', 'createDirectory'] });
+    if (selection.canceled || !selection.filePaths.length) return;
+    const sourceSession = app.getPath('sessionData');
+    const destination = await validateDestination(sourceRoot, sourceSession, selection.filePaths[0]);
+    const answer = await dialog.showMessageBox(mainWindow, { type: 'question', title: 'Move Library',
+      message: isDevelopment ? 'Move the library when you reopen the development preview?' : 'Move your entire library and restart?',
+      detail: `From: ${sourceRoot}\nTo: ${destination}\n\nImages, OCR, boxes, favorites and canvases will be copied and verified after the app closes. The old folder will stay as a backup. Do not edit either folder during the move.${isDevelopment ? '\n\nReopen the development preview to complete the move.' : ''}`,
+      buttons: [isDevelopment ? 'Move & quit' : 'Move & restart', 'Cancel'], defaultId: 1, cancelId: 1 });
+    if (answer.response !== 0) return;
+    if (pendingCaptures.size) throw new Error('Finish saving your screenshot before moving the library.');
+    await library.getLocation();
+    const configPath = path.join(app.getPath('userData'), 'library-location.json');
+    let config = {};
+    try { config = JSON.parse(await fs.readFile(configPath, 'utf8')); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+    await writeConfig(configPath, { ...config, pendingMove: { sourceRoot, sourceSession, destination } });
+    mainWindow.webContents.session.flushStorageData();
+    if (!isDevelopment) app.relaunch();
+    app.quit();
+  } finally { movingLibrary = false; }
+}
+
 function openWindow() {
   mainWindow = new BrowserWindow({
+    icon: path.join(__dirname, 'assets', 'app-icon.png'),
     width: 1440, height: 940, minWidth: 1080, minHeight: 700,
     title: isDevelopment ? 'Fragmente-Projekt · Development' : 'Fragmente-Projekt',
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true, backgroundThrottling: false },
@@ -103,14 +150,23 @@ if (!app.requestSingleInstanceLock()) {
     if (mainWindow) { mainWindow.restore(); mainWindow.focus(); }
   });
   app.whenReady().then(async () => {
+    if (process.platform === 'darwin') {
+      app.setActivationPolicy('regular');
+      app.dock.setIcon(path.join(__dirname, 'assets', 'app-icon.png'));
+      await app.dock.show();
+    }
     if (!(await chooseLibrary())) { app.quit(); return; }
-    for (const method of ['scan', 'read', 'confirm', 'store', 'openFolder', 'reclassify']) {
+    for (const method of ['scan', 'read', 'confirm', 'store', 'openFolder', 'getLocation', 'reclassify']) {
       ipcMain.handle(`library:${method}`, (event, ...args) => {
         if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) throw new Error('Untrusted sender');
         return library[method](...args);
       });
     }
     openWindow();
+    ipcMain.handle('library:move', (event) => {
+      if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) throw new Error('Untrusted sender');
+      return moveLibrary();
+    });
     ipcMain.handle('clipboard:read-image', (event) => {
       if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) throw new Error('Untrusted sender');
       return readClipboardPng(clipboard, nativeImage);

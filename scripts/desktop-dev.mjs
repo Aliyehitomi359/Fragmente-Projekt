@@ -70,5 +70,5 @@ try {
   process.on('SIGINT', () => void shutdown());
   process.on('SIGTERM', () => void shutdown());
   console.log('Desktop preview: UI changes refresh automatically; Electron changes restart the app.');
-  console.log('Test library: Desktop/Fragmente-Projekt Preview Library (separate from your installed app).');
+  console.log('The preview uses a separate library from the installed app. Find its current path in Library settings.');
 } catch (error) { console.error(error.message); await shutdown(1); }

@@ -45,6 +45,11 @@ export function nowIso() {
   return new Date().toISOString();
 }
 
+export async function flushDatabase() {
+  const db = await dbPromise;
+  await db.transaction(['sources', 'fragments', 'boxes', 'canvases'], 'readwrite').done;
+}
+
 export async function ensureDefaults() {
   const db = await dbPromise;
   const tx = db.transaction(['boxes', 'canvases'], 'readwrite');

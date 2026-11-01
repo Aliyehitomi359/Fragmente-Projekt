@@ -136,7 +136,7 @@ async function createLibrary(root) {
       if (crypto.createHash('sha256').update(content).digest('hex') === hash) await fs.unlink(file);
     }
   }
-  const operations = { scan, read, confirm, store, reclassify, openFolder: async () => {
+  const operations = { scan, read, confirm, store, reclassify, getLocation: async () => root, openFolder: async () => {
     const result = await require('electron').shell.openPath(root);
     if (result) throw new Error(result);
   } };

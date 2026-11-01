@@ -8,6 +8,7 @@ import {
   DEFAULT_BOX_ID,
   IS_DEMO,
   convertLibraryImage,
+  flushDatabase,
   loadAllData,
   nowIso,
   saveBox,
@@ -2856,22 +2857,49 @@ function LibraryBackup({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [folderError, setFolderError] = useState('');
+  const [libraryLocation, setLibraryLocation] = useState('');
+  const [isMovingLibrary, setIsMovingLibrary] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !window.desktopLibrary?.getLocation) return;
+    let cancelled = false;
+    window.desktopLibrary.getLocation().then((location) => {
+      if (!cancelled) setLibraryLocation(location);
+    }).catch((failure) => {
+      if (!cancelled) setFolderError(String(failure));
+    });
+    return () => { cancelled = true; };
+  }, [isOpen]);
 
   return (
     <div className="library-backup">
-      <button className="tools-toggle" onClick={() => setIsOpen((current) => !current)}>
+      <button className="tools-toggle" aria-label="Library settings" aria-expanded={isOpen} title="Library settings" onClick={() => setIsOpen((current) => !current)}>
         ☰
       </button>
       {isOpen && (
         <div className="tools-panel">
           <div className="backup-actions">
-            {window.desktopLibrary && <button onClick={async () => {
-              try { await window.desktopLibrary!.openFolder(); setFolderError(''); }
+            {window.desktopLibrary && <button title="Open the local Library containing your Sources and Fragments image files." onClick={async () => {
+              try { await window.desktopLibrary!.openFolder(); setFolderError(''); setIsOpen(false); }
               catch (failure) { setFolderError(String(failure)); }
             }}>Open Library Folder</button>}
+            {window.desktopLibrary && <button disabled={isMovingLibrary} title="Choose a new location for the whole library. The old folder will be kept as a backup." onClick={async () => {
+              setIsMovingLibrary(true);
+              setFolderError('');
+              try {
+                if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+                await flushDatabase();
+                await window.desktopLibrary!.moveLibrary();
+              } catch (failure) { setFolderError(String(failure)); }
+              finally { setIsMovingLibrary(false); }
+            }}>{isMovingLibrary ? 'Preparing move...' : 'Move Library...'}</button>}
             <button title="Save a backup to a separate folder. Choose where the backup will be written." onClick={() => void onExport()}>{window.desktopLibrary ? 'Back Up Library...' : 'Export / update library'}</button>
             <button title="Load an existing backup folder containing manifest.json. Matching items will be updated; other items remain." onClick={() => void onImport()}>{window.desktopLibrary ? 'Restore Library...' : 'Import library'}</button>
           </div>
+          {window.desktopLibrary && libraryLocation && <div className="library-location">
+            <span>Library location</span>
+            <code>{libraryLocation}</code>
+          </div>}
           {folderError && <p role="alert">{folderError}</p>}
           {!window.desktopLibrary && <p>
             To update, choose the same library folder you exported before. Export updates <code>manifest.json</code>,{' '}

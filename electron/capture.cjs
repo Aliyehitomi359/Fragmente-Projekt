@@ -10,10 +10,24 @@ function createCapture({ getMainWindow, importCapture }) {
   const widget = new BrowserWindow({
     x: area.x + area.width - 220, y: area.y + area.height - 240,
     width: 76, height: 80, frame: false, transparent: true, resizable: false,
-    alwaysOnTop: true, skipTaskbar: true, hasShadow: false,
-    webPreferences: { preload: path.join(__dirname, 'capture-preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false },
+    alwaysOnTop: true, skipTaskbar: process.platform === 'win32', hasShadow: false,
+    acceptFirstMouse: true,
+    ...(process.platform === 'darwin' ? { type: 'panel' } : {}),
+    webPreferences: { preload: path.join(__dirname, 'capture-preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false, backgroundThrottling: false },
   });
-  widget.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // A capture utility must not turn the whole macOS app into a Dock-less UI agent.
+  widget.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
+  widget.setAlwaysOnTop(true, 'floating');
+  const mainWindow = getMainWindow();
+  function raiseWidget() {
+    if (!widget.isDestroyed() && !overlay && !starting) {
+      widget.setAlwaysOnTop(true, 'floating');
+      widget.showInactive();
+      widget.moveTop();
+    }
+  }
+  mainWindow?.on('show', raiseWidget);
+  mainWindow?.on('focus', raiseWidget);
   widget.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   widget.webContents.on('will-navigate', (event) => event.preventDefault());
   void widget.loadFile(path.join(__dirname, 'capture-widget.html'));
@@ -59,11 +73,11 @@ function createCapture({ getMainWindow, importCapture }) {
       if (!source || source.thumbnail.isEmpty()) throw new Error('Screen capture unavailable. Check your screen recording permission.');
       image = source.thumbnail;
       overlay = new BrowserWindow({ ...display.bounds, frame: false, resizable: false, movable: false,
-        alwaysOnTop: true, skipTaskbar: true, show: false,
+        alwaysOnTop: true, skipTaskbar: process.platform === 'win32', show: false, acceptFirstMouse: true,
         webPreferences: { preload: path.join(__dirname, 'capture-preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false },
       });
       overlay.setAlwaysOnTop(true, 'screen-saver');
-      overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+      overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
       overlay.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
       overlay.webContents.on('will-navigate', (event) => event.preventDefault());
       overlay.webContents.once('did-finish-load', () => {
@@ -87,7 +101,13 @@ function createCapture({ getMainWindow, importCapture }) {
         return;
       }
       if (name === 'start') return start(value);
-      if (name === 'open') { const main = getMainWindow(); main?.restore(); main?.show(); main?.focus(); }
+      if (name === 'open') {
+        const main = getMainWindow();
+        if (main && !main.isDestroyed()) {
+          if (main.isMinimized()) main.restore();
+          main.show(); main.focus();
+        }
+      }
       if (name === 'quit') app.quit();
       return;
     }
@@ -105,6 +125,10 @@ function createCapture({ getMainWindow, importCapture }) {
       } finally { saving = false; }
     }
   }
-  return { action, destroy: () => { overlay?.destroy(); widget.destroy(); } };
+  return { action, destroy: () => {
+    mainWindow?.removeListener('show', raiseWidget);
+    mainWindow?.removeListener('focus', raiseWidget);
+    overlay?.destroy(); widget.destroy();
+  } };
 }
 module.exports = { createCapture };

@@ -9,6 +9,7 @@ test('root images stay unclassified until confirmed, survive restart and are not
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'fragmente-library-'));
   try {
     const library = await createLibrary(root);
+    assert.equal(await library.getLocation(), root);
     await fs.writeFile(path.join(root, 'page.png'), Buffer.from('test-image'));
     assert.equal((await library.scan()).length, 0);
     const [candidate] = await library.scan();
@@ -19,6 +20,7 @@ test('root images stay unclassified until confirmed, survive restart and are not
     await assert.rejects(fs.access(path.join(root, 'page.png')));
     assert.equal((await fs.readdir(path.join(root, 'Sources'))).length, 1);
     const reopened = await createLibrary(root);
+    assert.equal(await reopened.getLocation(), root);
     await reopened.scan();
     assert.equal((await reopened.scan()).length, 0);
     await reopened.store('fragment', 'image-one', 'image/png', new Uint8Array([1, 2, 3]));
