@@ -442,11 +442,11 @@ h2 {
 .table-fragment {
   position: absolute;
   display: grid;
-  gap: 4px;
-  padding: 5px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(90, 70, 48, 0.22);
-  border-radius: 3px;
+  gap: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   box-shadow: 0 6px 12px rgba(60, 35, 20, 0.18);
   cursor: grab;
   transform-origin: center;
@@ -465,9 +465,8 @@ h2 {
 .table-fragment-img {
   display: block;
   width: 100%;
-  max-height: 86px;
-  object-fit: contain;
-  background: #ffffff;
+  height: auto;
+  background: transparent;
   cursor: grab;
 }
 

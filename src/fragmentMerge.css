@@ -1,0 +1,22 @@
+.fragment-merge-toolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:8px 0;font-size:12px}
+.fragment-merge-toolbar button{padding:4px 7px;font-size:12px}
+.merge-select{position:absolute;top:6px;left:6px;z-index:2;display:grid;place-items:center;padding:4px;background:var(--card-paper,#fff);border:1px solid var(--ink,#252b28)}
+.merge-select input[type=checkbox]{width:16px;height:16px;margin:0;padding:0;cursor:pointer}
+.fragment-card.merge-selected{outline:2px solid var(--wine,#611412);outline-offset:-2px}
+.fragment-merge-dialog{width:min(680px,calc(100vw - 32px));max-height:calc(100dvh - 40px);padding:20px;overflow:auto;background:var(--card-paper,#faf8f0);color:var(--ink,#252b28);border:1px solid var(--ink,#252b28);border-radius:4px}
+.fragment-merge-dialog::backdrop{background:#0008}
+.merge-dialog-head{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:16px}
+.merge-dialog-head h2{margin:0;font-size:18px}
+.merge-dialog-head button{width:28px;height:28px;padding:0;font-size:20px}
+.merge-options{display:flex;align-items:center;flex-wrap:wrap;gap:12px;border:0;padding:0;margin:0 0 16px;font-size:12px}
+.merge-options legend{font-size:12px;margin-bottom:8px}
+.merge-options label{display:flex;align-items:center;gap:4px}
+.fragment-merge-dialog .merge-options input[type=radio]{width:14px;height:14px;margin:0}
+.fragment-merge-dialog .merge-options input[type=number]{width:58px;min-width:0;padding:4px}
+.merge-options button{width:30px;height:28px;padding:0;font-size:18px}
+.merge-image-preview{display:flex;align-items:center;justify-content:center;width:100%;height:230px;overflow:auto;background:var(--worktop,#02121f);margin-bottom:16px;padding:12px}
+.merge-image-preview img{display:block;max-width:100%;max-height:100%;object-fit:contain}
+.merge-text-label,.merge-box-label{display:grid;gap:5px;margin-top:12px;font-size:12px}
+.merge-text-label input,.merge-box-label select{width:100%;min-width:0;font:inherit;padding:7px}
+.merge-save-row{display:flex;justify-content:flex-end;margin-top:18px}
+.fragment-merge-dialog p[role=alert]{font-size:12px;color:#8b1717;overflow-wrap:anywhere}

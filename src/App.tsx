@@ -4,6 +4,7 @@ import * as htmlToImage from 'html-to-image';
 import Tesseract from 'tesseract.js';
 import { FolderImports } from './FolderImports';
 import { ClipboardImport } from './ClipboardImport';
+import { FragmentMergeDialog } from './FragmentMergeDialog';
 import {
   DEFAULT_BOX_ID,
   IS_DEMO,
@@ -2687,6 +2688,7 @@ function FragmentLibrary({
   activeBoxId,
   onUpdateFragment,
   onDeleteFragment,
+  onMergeFragment,
 }: {
   fragments: Fragment[];
   sources: SourcePage[];
@@ -2694,10 +2696,15 @@ function FragmentLibrary({
   activeBoxId: string;
   onUpdateFragment: (fragment: Fragment) => Promise<void>;
   onDeleteFragment: (fragmentId: string) => Promise<void>;
+  onMergeFragment: (fragment: Fragment) => Promise<void>;
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [mergeMode, setMergeMode] = useState(false);
+  const [mergeIds, setMergeIds] = useState<string[]>([]);
+  const [showMerge, setShowMerge] = useState(false);
+  const mergeFragments = mergeIds.map(id => fragments.find(f => f.id === id)).filter((f): f is Fragment => !!f);
   const normalizedSearch = normalizeSearchText(searchQuery);
   const sourceById = useMemo(() => new Map(sources.map((source) => [source.id, source])), [sources]);
   const pageSize = 8;
@@ -2741,6 +2748,11 @@ function FragmentLibrary({
           placeholder="Search recognized text, author, or book"
         />
       </label>
+      {mergeMode && <div className="fragment-merge-toolbar">
+          <span>{mergeFragments.length} / 2 selected</span>
+          <button disabled={mergeFragments.length !== 2} onClick={() => setShowMerge(true)}>Merge</button>
+          <button aria-label="Cancel fragment selection" title="Cancel" onClick={() => { setMergeMode(false); setMergeIds([]); }}>×</button>
+      </div>}
       <div className="pagination">
         <button disabled={safePage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>
           Prev
@@ -2763,7 +2775,8 @@ function FragmentLibrary({
       <div className="fragment-list">
         {visibleFragments.length === 0 && <div className="empty-library">No fragments found.</div>}
         {pageFragments.map((fragment) => (
-          <article key={fragment.id} className="fragment-card">
+          <article key={fragment.id} className={`fragment-card ${mergeMode && mergeIds.includes(fragment.id) ? 'merge-selected' : ''}`}>
+            {mergeMode && <label className="merge-select"><input type="checkbox" aria-label={`Select ${fragment.ocrText || 'fragment'} for merge`} checked={mergeIds.includes(fragment.id)} disabled={!mergeIds.includes(fragment.id) && mergeFragments.length >= 2} onChange={e => { const checked = e.currentTarget.checked; setMergeIds(ids => checked ? [...ids, fragment.id] : ids.filter(id => id !== fragment.id)); }} /></label>}
             <button
               className="fragment-menu-button"
               onClick={() => setOpenMenuId((current) => (current === fragment.id ? null : fragment.id))}
@@ -2774,6 +2787,7 @@ function FragmentLibrary({
               <div className="fragment-menu">
                 <fieldset className="fragment-box-memberships">
                   <legend>Stored in</legend>
+                  <div className="fragment-box-options" role="group" aria-label="Choose boxes">
                   {boxes.map((box) => <label key={box.id}>
                     <input type="checkbox" checked={fragmentBoxIds(fragment).includes(box.id)}
                       onChange={(event) => {
@@ -2783,7 +2797,13 @@ function FragmentLibrary({
                       }} />
                     {box.name}
                   </label>)}
+                  </div>
                 </fieldset>
+                <button onClick={() => {
+                  setMergeIds([fragment.id]);
+                  setMergeMode(true);
+                  setOpenMenuId(null);
+                }}>Merge with another fragment</button>
                 <button className="danger-button" onClick={() => void onDeleteFragment(fragment.id)}>
                   Delete fragment
                 </button>
@@ -2793,7 +2813,7 @@ function FragmentLibrary({
               blob={fragment.imageBlob}
               alt="Fragment"
               className="fragment-preview"
-              draggable
+              draggable={!mergeMode}
               onDragStart={(event) => {
                 event.dataTransfer.setData('text/plain', fragment.id);
                 event.dataTransfer.setData('application/x-fragmente-fragment', fragment.id);
@@ -2819,6 +2839,11 @@ function FragmentLibrary({
           </article>
         ))}
       </div>
+      {showMerge && mergeFragments.length === 2 && <FragmentMergeDialog
+        fragments={mergeFragments as [Fragment, Fragment]} boxes={boxes}
+        initialBoxId={boxes.some(b => b.id === activeBoxId) ? activeBoxId : DEFAULT_BOX_ID}
+        onSave={async fragment => { await onMergeFragment(fragment); setSearchQuery(''); setCurrentPage(1); setMergeMode(false); setMergeIds([]); }}
+        onClose={() => setShowMerge(false)} />}
       {visibleFragments.length > pageSize && (
         <div className="pagination pagination-bottom">
           <button disabled={safePage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>
@@ -2894,7 +2919,7 @@ function LibraryBackup({
               finally { setIsMovingLibrary(false); }
             }}>{isMovingLibrary ? 'Preparing move...' : 'Move Library...'}</button>}
             <button title="Save a backup to a separate folder. Choose where the backup will be written." onClick={() => void onExport()}>{window.desktopLibrary ? 'Back Up Library...' : 'Export / update library'}</button>
-            <button title="Load an existing backup folder containing manifest.json. Matching items will be updated; other items remain." onClick={() => void onImport()}>{window.desktopLibrary ? 'Restore Library...' : 'Import library'}</button>
+            <button title="Choose the complete Library folder you previously backed up, containing manifest.json and the sources, fragments, and canvases folders. Do not select only a sources or fragments subfolder; it cannot restore your library." onClick={() => void onImport()}>{window.desktopLibrary ? 'Restore Library...' : 'Import library'}</button>
           </div>
           {window.desktopLibrary && libraryLocation && <div className="library-location">
             <span>Library location</span>
@@ -3752,6 +3777,12 @@ export default function App() {
               activeBoxId={activeBoxId}
               onUpdateFragment={updateFragment}
               onDeleteFragment={removeFragment}
+              onMergeFragment={async fragment => {
+                await saveFragment(fragment);
+                await refresh();
+                setActiveBoxId(fragment.boxId);
+                setLibraryNotice('Merged fragment saved. The original fragments are unchanged.');
+              }}
             />
           </>
         )}

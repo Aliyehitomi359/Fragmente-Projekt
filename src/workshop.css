@@ -186,7 +186,8 @@ button.selected, .workspace-switch button.selected,
 .box-name-edit { width: 80px; min-width: 0; height: 27px; padding: 4px 5px; font-size: 12px; background: var(--button-paper); border: 1px solid var(--wine); }
 .box-row { flex-wrap: wrap; }
 .tools-panel { position: fixed; top: 98px; right: 14px; width: min(302px, calc(100vw - 28px)); max-height: calc(100dvh - 112px); overflow-y: auto; z-index: 100; }
-.fragment-box-memberships { margin: 0; padding: 0; border: 0; min-width: 0; display: grid; gap: 5px; max-height: 200px; overflow-y: auto; }
+.fragment-box-memberships { margin: 0; padding: 0; border: 0; min-width: 0; }
+.fragment-box-options { display: grid; gap: 5px; max-height: 180px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 .fragment-box-memberships legend { margin-bottom: 6px; font-size: 11px; }
 .fragment-menu .fragment-box-memberships label { display: flex; align-items: center; gap: 6px; font-size: 12px; overflow-wrap: anywhere; }
 .fragment-box-memberships input { flex: 0 0 auto; accent-color: var(--wine); }

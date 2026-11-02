@@ -35,7 +35,8 @@ export interface Fragment {
   imageBlob: Blob;
   createdAt: string;
   updatedAt: string;
-  sourceType: 'cropped' | 'direct-upload';
+  sourceType: 'cropped' | 'direct-upload' | 'merged';
+  mergedFromFragmentIds?: string[];
   sourcePageId?: string;
   cutRegionId?: string;
   ocrText?: string;
