@@ -2,6 +2,7 @@ const { BrowserWindow, desktopCapturer, screen, systemPreferences, app } = requi
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { cropPixels } = require('./capture-geometry.cjs');
+const { PNG } = require('pngjs');
 
 function createCapture({ getMainWindow, importCapture }) {
   let overlay, image, display, kind, captureId, captureName, saving = false, starting = false;
@@ -118,7 +119,16 @@ function createCapture({ getMainWindow, importCapture }) {
       saving = true;
       try {
         const cropped = kind === 'source' ? image : image.crop(cropPixels(value, display.bounds, image.getSize()));
-        await importCapture({ id: captureId, kind, bytes: new Uint8Array(cropped.toPNG()), name: captureName });
+        let bytes = cropped.toPNG();
+        if (kind === 'fragment' && value.rotatedPng !== undefined) {
+          if (typeof value.rotatedPng !== 'string' || value.rotatedPng.length > 48_000_000 || !value.rotatedPng.startsWith('data:image/png;base64,')) throw new Error('Invalid rotated screenshot.');
+          const png = Buffer.from(value.rotatedPng.slice('data:image/png;base64,'.length), 'base64');
+          if (png.length < 24 || png.readUInt32BE(16) * png.readUInt32BE(20) > 32_000_000) throw new Error('Rotated screenshot is too large.');
+          const decoded = PNG.sync.read(png);
+          if (!decoded.width || !decoded.height) throw new Error('Invalid rotated screenshot.');
+          bytes = png;
+        }
+        await importCapture({ id: captureId, kind, bytes: new Uint8Array(bytes), name: captureName });
         finish(); status('Saved in the app and your local Library.');
       } catch (error) {
         if (overlay && !overlay.isDestroyed()) overlay.webContents.send('capture-ui:state', { error: error.message });

@@ -41,7 +41,7 @@ function fixture(permission = 'granted', save = async () => {}) {
   const module = { exports: {} };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, 'capture.cjs'), 'utf8'), {
     module, require: (id) => id === 'electron' ? electron : require(id), __dirname,
-    process: { platform: 'darwin' }, setTimeout, Uint8Array, console,
+    process: { platform: 'darwin' }, setTimeout, Uint8Array, Buffer, console,
   });
   const controller = module.exports.createCapture({ getMainWindow: () => main, importCapture: save });
   const event = (window) => ({ sender: window.webContents, senderFrame: window.webContents.mainFrame });
@@ -68,6 +68,21 @@ test('permission denial captures nothing and restores the widget', async () => {
   assert.equal(f.scans(), 0);
   assert.equal(f.windows[0].visible, true);
   assert.ok(f.messages.some(({ state }) => state.error && state.text.includes('Screen Recording')));
+});
+
+test('rotated fragment pixels are saved and malformed images remain retryable', async () => {
+  const { PNG } = require('pngjs');
+  const png = PNG.sync.write(new PNG({ width: 12, height: 8, fill: true }));
+  const saved = [];
+  const f = fixture('granted', async payload => saved.push(payload));
+  await f.controller.action(f.event(f.windows[0]), 'start', 'fragment');
+  const region = { x: 10, y: 20, width: 100, height: 40 };
+  await f.controller.action(f.event(f.windows[1]), 'save', { ...region, rotatedPng: 'invalid' });
+  assert.equal(saved.length, 0);
+  assert.equal(f.windows[1].destroyed, false);
+  await f.controller.action(f.event(f.windows[1]), 'save', { ...region, rotatedPng: `data:image/png;base64,${png.toString('base64')}` });
+  assert.equal(saved.length, 1);
+  assert.deepEqual(Buffer.from(saved[0].bytes), png);
 });
 
 test('widget opens hidden or minimized main app without taking a screenshot', async () => {

@@ -3,15 +3,56 @@
 <style>
 *{box-sizing:border-box}body{margin:0;overflow:hidden;background:#02121f;font:13px monospace;color:#252b28;user-select:none}#screen{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}#shade{position:absolute;inset:0;background:#0005;pointer-events:none}#selection{position:absolute;border:2px solid #b0d5c5;box-shadow:0 0 0 99999px #0006;pointer-events:none}#selection[hidden]{display:none}#actions{position:fixed;top:16px;left:50%;transform:translateX(-50%);padding:8px;background:#f7f4eb;border:1px solid #252b28;display:flex;gap:8px;align-items:center;max-width:calc(100vw - 32px);flex-wrap:wrap;z-index:2;box-shadow:2px 3px #0004}button{font:inherit;padding:7px 10px;border:1px solid #252b28;background:#b0d5c5;color:#252b28;cursor:pointer}button:disabled{opacity:.5;cursor:default}#error{color:#a11414;max-width:400px}#hint{max-width:360px}body.selecting{cursor:crosshair}#dimensions{white-space:nowrap;font-size:11px}
 </style></head><body class="selecting">
-<img id="screen" alt="Screenshot preview" draggable="false"><div id="shade"></div><div id="selection" hidden></div>
-<div id="actions"><span id="hint">Select a text fragment</span><span id="dimensions"></span><button id="save" disabled>Save fragment</button><button id="retake">Retake</button><button id="cancel" aria-label="Cancel screenshot">×</button><span id="error" role="alert"></span></div>
+<style>
+#selection{transform-origin:center;box-sizing:content-box}
+.rotate-handle{position:absolute;top:-34px;width:28px;height:28px;padding:0;border:0;background:transparent;pointer-events:auto;cursor:grab;touch-action:none}
+.rotate-handle::before{content:'';position:absolute;left:13px;top:18px;width:2px;height:16px;background:#b0d5c5}
+.rotate-handle::after{content:'';position:absolute;left:6px;top:4px;width:14px;height:14px;border:2px solid #252b28;border-radius:50%;background:#b0d5c5;box-shadow:0 0 0 1px #f7f4eb}
+.rotate-handle:hover::after,.rotate-handle:focus-visible::after{background:#fff}
+.rotate-handle:active{cursor:grabbing}
+.rotate-handle{left:calc(50% - 14px)}
+#selection.drawing .rotate-handle{display:none}
+</style>
+<img id="screen" alt="Screenshot preview" draggable="false"><div id="shade"></div><div id="selection" hidden><button class="rotate-handle" aria-label="Rotate capture frame" title="Drag to rotate capture frame"></button></div>
+<div id="actions"><span id="hint">Select a text fragment</span><span id="dimensions"></span><button id="reset" hidden>Reset rotation</button><button id="save" disabled>Save fragment</button><button id="retake">Retake</button><button id="cancel" aria-label="Cancel screenshot">×</button><span id="error" role="alert"></span></div>
+<canvas id="rotated" hidden></canvas>
 <script>
 const image=document.querySelector('#screen'),selection=document.querySelector('#selection'),save=document.querySelector('#save'),error=document.querySelector('#error');let kind,rect,start,busy=false;
-function draw(){selection.hidden=false;Object.assign(selection.style,{left:rect.x+'px',top:rect.y+'px',width:rect.width+'px',height:rect.height+'px'});const sx=image.naturalWidth/innerWidth,sy=image.naturalHeight/innerHeight;document.querySelector('#dimensions').textContent=Math.round(rect.width*sx)+' × '+Math.round(rect.height*sy)+' px';save.disabled=rect.width<3||rect.height<3}
-window.captureUI.onState(state=>{if(state.error){error.textContent=state.error;busy=false;document.querySelectorAll('button').forEach(b=>b.disabled=false);return}kind=state.kind;image.src=state.image;image.onload=()=>{if(kind==='source'){rect={x:0,y:0,width:innerWidth,height:innerHeight};document.querySelector('#shade').hidden=true;document.body.classList.remove('selecting');save.disabled=false;document.querySelector('#hint').textContent='Save this screen as a source?';save.textContent='Save source';document.querySelector('#dimensions').textContent=image.naturalWidth+' × '+image.naturalHeight+' px'}}});
-document.onpointerdown=e=>{if(busy||kind!=='fragment'||e.button!==0||e.target.closest('#actions'))return;start={x:e.clientX,y:e.clientY};rect={x:start.x,y:start.y,width:0,height:0};document.body.setPointerCapture(e.pointerId);document.querySelector('#shade').hidden=true;draw()};
-document.onpointermove=e=>{if(!start)return;const x=Math.max(0,Math.min(innerWidth,e.clientX)),y=Math.max(0,Math.min(innerHeight,e.clientY));rect={x:Math.min(start.x,x),y:Math.min(start.y,y),width:Math.abs(start.x-x),height:Math.abs(start.y-y)};draw()};
-document.onpointerup=()=>start=null;document.onpointercancel=()=>start=null;
-save.onclick=async()=>{if(busy||!rect)return;busy=true;error.textContent='';document.querySelectorAll('button').forEach(b=>b.disabled=true);try{await window.captureUI.action('save',rect)}catch(e){error.textContent=e.message;busy=false;document.querySelectorAll('button').forEach(b=>b.disabled=false)}};
+const rotated=document.querySelector('#rotated'),reset=document.querySelector('#reset');
+let angle=0,rotationDrag=null;
+function updateRotation(value){
+  angle=((Number(value)+180)%360+360)%360-180;
+  selection.style.transform='rotate('+angle+'deg)';reset.hidden=angle===0;
+  if(!rect)return;
+  const sx=image.naturalWidth/innerWidth,sy=image.naturalHeight/innerHeight;
+  const w=Math.max(1,Math.round(rect.width*sx)),h=Math.max(1,Math.round(rect.height*sy));
+  const a=angle*Math.PI/180;
+  rotated.width=w;rotated.height=h;
+  // Inverse-map the tilted frame into a level output, sampling the unchanged screen.
+  const ctx=rotated.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);
+  ctx.translate(w/2,h/2);ctx.scale(sx,sy);ctx.rotate(-a);
+  ctx.drawImage(image,-(rect.x+rect.width/2),-(rect.y+rect.height/2),innerWidth,innerHeight);
+}
+reset.onclick=()=>updateRotation(0);
+function draw(){selection.hidden=false;Object.assign(selection.style,{left:rect.x+'px',top:rect.y+'px',width:rect.width+'px',height:rect.height+'px'});const sx=image.naturalWidth/innerWidth,sy=image.naturalHeight/innerHeight;document.querySelector('#dimensions').textContent=Math.round(rect.width*sx)+' × '+Math.round(rect.height*sy)+' px';save.disabled=rect.width<3||rect.height<3;
+}
+window.captureUI.onState(state=>{if(state.error){error.textContent=state.error;busy=false;document.querySelectorAll('button,input').forEach(b=>b.disabled=false);return}kind=state.kind;image.src=state.image;image.onload=()=>{if(kind==='source'){rect={x:0,y:0,width:innerWidth,height:innerHeight};document.querySelector('#shade').hidden=true;document.body.classList.remove('selecting');save.disabled=false;document.querySelector('#hint').textContent='Save this screen as a source?';save.textContent='Save source';document.querySelector('#dimensions').textContent=image.naturalWidth+' × '+image.naturalHeight+' px'}}});
+document.onpointerdown=e=>{
+  if(busy||kind!=='fragment'||e.button!==0||e.target.closest('#actions'))return;
+  e.preventDefault();document.body.setPointerCapture(e.pointerId);
+  if(e.target.closest('.rotate-handle')&&rect){
+    const cx=rect.x+rect.width/2,cy=rect.y+rect.height/2;
+    rotationDrag={cx,cy,pointerAngle:Math.atan2(e.clientY-cy,e.clientX-cx),angle};return;
+  }
+  start={x:e.clientX,y:e.clientY};rect={x:start.x,y:start.y,width:0,height:0};angle=0;selection.style.transform='';reset.hidden=true;selection.classList.add('drawing');document.querySelector('#shade').hidden=true;draw();
+};
+document.onpointermove=e=>{
+  if(rotationDrag){const d=rotationDrag;updateRotation(d.angle+(Math.atan2(e.clientY-d.cy,e.clientX-d.cx)-d.pointerAngle)*180/Math.PI);return;}
+  if(!start)return;const x=Math.max(0,Math.min(innerWidth,e.clientX)),y=Math.max(0,Math.min(innerHeight,e.clientY));rect={x:Math.min(start.x,x),y:Math.min(start.y,y),width:Math.abs(start.x-x),height:Math.abs(start.y-y)};draw();
+};
+function endPointer(e){if(rotationDrag){rotationDrag=null;}else if(start){start=null;selection.classList.remove('drawing');if(rect.width<3||rect.height<3)selection.hidden=true;updateRotation(0);}if(document.body.hasPointerCapture(e.pointerId))document.body.releasePointerCapture(e.pointerId);}
+document.onpointerup=endPointer;document.onpointercancel=endPointer;
+document.querySelectorAll('.rotate-handle').forEach(handle=>handle.onkeydown=e=>{if(busy)return;if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();updateRotation(angle+(e.key==='ArrowLeft'?-0.5:0.5));}});
+save.onclick=async()=>{if(busy||!rect)return;busy=true;error.textContent='';document.querySelectorAll('button,input').forEach(b=>b.disabled=true);try{await window.captureUI.action('save',{...rect,...(angle!==0?{rotatedPng:rotated.toDataURL('image/png')}:{})})}catch(e){error.textContent=e.message;busy=false;document.querySelectorAll('button,input').forEach(b=>b.disabled=false)}};
 document.querySelector('#retake').onclick=()=>window.captureUI.action('retake');document.querySelector('#cancel').onclick=()=>window.captureUI.action('cancel');document.onkeydown=e=>{if(e.key==='Escape'&&!busy)window.captureUI.action('cancel')};
 </script></body></html>

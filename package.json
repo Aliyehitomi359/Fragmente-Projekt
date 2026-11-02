@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "desktop": "npm run build && electron .",
     "desktop:dev": "node scripts/desktop-dev.mjs",
-    "package:mac": "npm run build && electron-builder --mac dmg zip",
+    "package:mac": "npm run build && electron-builder --mac dmg zip && node scripts/cleanup-mac-build.mjs",
     "package:win": "npm run build && electron-builder --win nsis"
   },
   "build": {
