@@ -160,7 +160,23 @@ export async function saveSource(source: SourcePage, syncFile = true) {
 
 export async function deleteSource(sourceId: string) {
   const db = await dbPromise;
+  const source = await db.get('sources', sourceId);
+  if (source) await removeUnsharedImage('source', sourceId, source.imageBlob);
   await db.delete('sources', sourceId);
+}
+
+async function removeUnsharedImage(kind: 'source' | 'fragment', id: string, blob: Blob) {
+  if (!window.desktopLibrary) return;
+  const db = await dbPromise;
+  const records = await db.getAll(kind === 'source' ? 'sources' : 'fragments');
+  const bytes = await blob.arrayBuffer();
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+  for (const record of records) {
+    if (record.id === id || record.imageBlob.size !== blob.size) continue;
+    const other = new Uint8Array(await crypto.subtle.digest('SHA-256', await record.imageBlob.arrayBuffer()));
+    if (digest.every((value, index) => value === other[index])) return;
+  }
+  await window.desktopLibrary.removeImage(kind, new Uint8Array(bytes));
 }
 
 export async function saveFragment(fragment: Fragment, syncFile = true) {
@@ -173,6 +189,8 @@ export async function saveFragment(fragment: Fragment, syncFile = true) {
 
 export async function deleteFragment(fragmentId: string) {
   const db = await dbPromise;
+  const fragment = await db.get('fragments', fragmentId);
+  if (fragment) await removeUnsharedImage('fragment', fragmentId, fragment.imageBlob);
   await db.delete('fragments', fragmentId);
 }
 

@@ -156,7 +156,7 @@ if (!app.requestSingleInstanceLock()) {
       await app.dock.show();
     }
     if (!(await chooseLibrary())) { app.quit(); return; }
-    for (const method of ['scan', 'read', 'confirm', 'store', 'openFolder', 'getLocation', 'reclassify']) {
+    for (const method of ['scan', 'read', 'confirm', 'store', 'openFolder', 'getLocation', 'reclassify', 'removeImage']) {
       ipcMain.handle(`library:${method}`, (event, ...args) => {
         if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) throw new Error('Untrusted sender');
         return library[method](...args);

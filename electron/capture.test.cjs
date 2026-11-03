@@ -17,6 +17,7 @@ function fixture(permission = 'granted', save = async () => {}) {
       windows.push(this);
     }
     setVisibleOnAllWorkspaces(visible, options) { this.workspaceOptions = options; } setAlwaysOnTop() {} focus() {} moveTop() { this.raised = true; }
+    setIgnoreMouseEvents(ignore, options) { this.ignoringMouse = ignore; this.mouseOptions = options; }
     getBounds() { return this.bounds; } setBounds(bounds) { this.bounds = bounds; }
     setPosition(x, y) { Object.assign(this.bounds, { x, y }); }
     isDestroyed() { return this.destroyed; } destroy() { this.destroyed = true; }
@@ -102,6 +103,12 @@ test('macOS widget keeps Dock policy and receives first clicks while main is foc
   assert.equal(widget.bounds.skipTaskbar, false);
   assert.equal(widget.bounds.acceptFirstMouse, true);
   assert.equal(widget.bounds.type, 'panel');
+  assert.equal(widget.ignoringMouse, true);
+  assert.equal(widget.mouseOptions.forward, true);
+  await f.controller.action(f.event(widget), 'ignore-mouse', false);
+  assert.equal(widget.ignoringMouse, false);
+  await f.controller.action(f.event(widget), 'ignore-mouse', true);
+  assert.equal(widget.ignoringMouse, true);
   assert.equal(widget.bounds.webPreferences.backgroundThrottling, false);
   assert.equal(widget.workspaceOptions.skipTransformProcessType, true);
   f.main.emit('focus');

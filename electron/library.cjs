@@ -4,7 +4,7 @@ const crypto = require('node:crypto');
 
 const extensions = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.bmp': 'image/bmp', '.tif': 'image/tiff', '.tiff': 'image/tiff' };
 
-async function createLibrary(root) {
+async function createLibrary(root, { trashItem = file => require('electron').shell.trashItem(file) } = {}) {
   for (const folder of ['Sources', 'Fragments', 'Canvases', '.app-data']) {
     await fs.mkdir(path.join(root, folder), { recursive: true });
   }
@@ -31,7 +31,7 @@ async function createLibrary(root) {
     const hash = crypto.createHash('sha256').update(buffer).digest('hex');
     const key = `${kind}:${hash}`;
     const folder = path.join(root, kind === 'source' ? 'Sources' : 'Fragments');
-    const label = String(text).normalize('NFC').replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().replace(/\.(png|jpe?g|webp|gif|bmp|tiff?)$/i, '').replace(/[. ]+$/g, '').slice(0, 60) || 'Untitled';
+    const label = String(text).normalize('NFC').replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().replace(/\.(png|jpe?g|webp|gif|bmp|tiff?)$/i, '').replace(/^[. ]+|[. ]+$/g, '').slice(0, 60) || 'Untitled';
     let previousFile;
     for (const entry of await fs.readdir(folder, { withFileTypes: true })) {
       if (!entry.isFile() || !extensions[path.extname(entry.name).toLowerCase()]) continue;
@@ -136,7 +136,17 @@ async function createLibrary(root) {
       if (crypto.createHash('sha256').update(content).digest('hex') === hash) await fs.unlink(file);
     }
   }
-  const operations = { scan, read, confirm, store, reclassify, getLocation: async () => root, openFolder: async () => {
+  async function removeImage(kind, bytes) {
+    if (!['source', 'fragment'].includes(kind)) throw new Error('Invalid image type.');
+    const hash = crypto.createHash('sha256').update(Buffer.from(bytes)).digest('hex');
+    const folder = path.join(root, kind === 'source' ? 'Sources' : 'Fragments');
+    for (const entry of await fs.readdir(folder, { withFileTypes: true })) {
+      if (!entry.isFile() || !extensions[path.extname(entry.name).toLowerCase()]) continue;
+      const file = path.join(folder, entry.name);
+      if (crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex') === hash) await trashItem(file);
+    }
+  }
+  const operations = { scan, read, confirm, store, reclassify, removeImage, getLocation: async () => root, openFolder: async () => {
     const result = await require('electron').shell.openPath(root);
     if (result) throw new Error(result);
   } };

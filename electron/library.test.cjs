@@ -5,6 +5,26 @@ const os = require('node:os');
 const path = require('node:path');
 const { createLibrary } = require('./library.cjs');
 
+test('removing an image trashes matching files only in its own category', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'fragmente-delete-test-'));
+  const trash = path.join(root, 'test-trash');
+  await fs.mkdir(trash);
+  try {
+    const library = await createLibrary(root, { trashItem: file => fs.rename(file, path.join(trash, path.basename(file))) });
+    await library.store('fragment', 'one', 'image/png', new Uint8Array([1, 2, 3]), 'First');
+    await library.store('fragment', 'two', 'image/png', new Uint8Array([4, 5, 6]), 'Other');
+    await library.store('source', 'source', 'image/png', new Uint8Array([1, 2, 3]), 'Source');
+    await library.removeImage('fragment', new Uint8Array([1, 2, 3]));
+    assert.equal((await fs.readdir(trash)).length, 1);
+    assert.equal((await fs.readdir(path.join(root, 'Fragments'))).length, 1);
+    assert.equal((await fs.readdir(path.join(root, 'Sources'))).length, 1);
+    const reopened = await createLibrary(root);
+    await reopened.scan();
+    assert.equal((await reopened.scan()).length, 0);
+    await assert.rejects(library.removeImage('../Sources', new Uint8Array([1])));
+  } finally { await fs.rm(root, { recursive: true, force: true }); }
+});
+
 test('root images stay unclassified until confirmed, survive restart and are not reimported', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'fragmente-library-'));
   try {
@@ -24,6 +44,8 @@ test('root images stay unclassified until confirmed, survive restart and are not
     await reopened.scan();
     assert.equal((await reopened.scan()).length, 0);
     await reopened.store('fragment', 'image-one', 'image/png', new Uint8Array([1, 2, 3]));
+    await reopened.store('fragment', 'image-one', 'image/png', new Uint8Array([1, 2, 3]), '. OCR text');
+    assert.ok((await fs.readdir(path.join(root, 'Fragments'))).every(name => !name.startsWith('.')));
     await reopened.scan();
     assert.equal((await reopened.scan()).length, 0);
     await reopened.reclassify('source', 'image/png', new Uint8Array([1, 2, 3]));

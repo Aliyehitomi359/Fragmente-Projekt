@@ -9,6 +9,7 @@ interface Window {
     getLocation(): Promise<string>;
     moveLibrary(): Promise<void>;
     reclassify(kind: 'source' | 'fragment', type: string, bytes: Uint8Array): Promise<void>;
+    removeImage(kind: 'source' | 'fragment', bytes: Uint8Array): Promise<void>;
     scan(): Promise<{ id: string; name: string; kind: 'source' | 'fragment' | null }[]>;
     read(id: string): Promise<{ name: string; type: string; bytes: Uint8Array; hash: string }>;
     confirm(id: string, kind: 'source' | 'fragment'): Promise<void>;

@@ -40,6 +40,19 @@ try {
   await db.deleteBox('b');
   assert.deepEqual((await db.loadAllData()).fragments[0].boxIds, [DEFAULT_BOX_ID]);
   await assert.rejects(db.deleteBox(DEFAULT_BOX_ID));
+  const removed = [];
+  window.desktopLibrary = { removeImage: async (...args) => removed.push(args) };
+  await db.saveFragment({ ...fragment, id: 'shared-copy' }, false);
+  await db.deleteFragment(fragment.id);
+  assert.equal(removed.length, 0, 'Keep shared pixels while another fragment references them');
+  await db.deleteFragment('shared-copy');
+  assert.equal(removed.length, 1);
+  assert.equal(removed[0][0], 'fragment');
+  await db.saveFragment(fragment, false);
+  window.desktopLibrary.removeImage = async () => { throw new Error('trash unavailable'); };
+  await assert.rejects(db.deleteFragment(fragment.id));
+  assert.ok((await db.loadAllData()).fragments.some(f => f.id === fragment.id), 'Keep record on disk failure');
+  window.desktopLibrary = undefined;
   console.log('Passed: legacy records, deduplication, multi-box persistence, metadata restore, box deletion, orphan fallback, default-box protection.');
 } finally {
   await rm(dir, { recursive: true, force: true });

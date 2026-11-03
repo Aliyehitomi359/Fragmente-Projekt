@@ -1192,8 +1192,9 @@ function SourcePanel({
                 ))}
                 <button
                   className="danger-button source-menu-delete"
+                  title="Delete carefully: this also moves the local image to Trash, unless another source still uses it."
                   onClick={() => {
-                    if (window.confirm(`Delete source "${source.name}"? Saved fragments from it will stay in the library.`)) {
+                    if (window.confirm(`Delete source "${source.name}"? Its local image will also be moved to Trash unless another source still uses it. Saved fragments from it will stay in the library.`)) {
                       onDelete(source.id);
                       setOpenSourceMenuId(null);
                     }
@@ -2804,7 +2805,9 @@ function FragmentLibrary({
                   setMergeMode(true);
                   setOpenMenuId(null);
                 }}>Merge with another fragment</button>
-                <button className="danger-button" onClick={() => void onDeleteFragment(fragment.id)}>
+                <button className="danger-button" title="Delete carefully: this also moves the local image to Trash, unless another fragment still uses it." onClick={() => {
+                  if (window.confirm('Delete this fragment? Its local image will also be moved to Trash unless another fragment still uses it. It will also be removed from your boxes and canvases.')) void onDeleteFragment(fragment.id);
+                }}>
                   Delete fragment
                 </button>
               </div>

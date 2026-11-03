@@ -19,6 +19,7 @@ function createCapture({ getMainWindow, importCapture }) {
   // A capture utility must not turn the whole macOS app into a Dock-less UI agent.
   widget.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
   widget.setAlwaysOnTop(true, 'floating');
+  widget.setIgnoreMouseEvents(true, { forward: true });
   const mainWindow = getMainWindow();
   function raiseWidget() {
     if (!widget.isDestroyed() && !overlay && !starting) {
@@ -94,6 +95,10 @@ function createCapture({ getMainWindow, importCapture }) {
     const fromOverlay = overlay && event.sender === overlay.webContents && event.senderFrame === overlay.webContents.mainFrame;
     if (!fromWidget && !fromOverlay) throw new Error('Untrusted capture request.');
     if (fromWidget) {
+      if (name === 'ignore-mouse' && typeof value === 'boolean') {
+        widget.setIgnoreMouseEvents(value, { forward: true });
+        return;
+      }
       if (name === 'expand') { resize(!!value); return; }
       if (name === 'move' && value && Number.isFinite(value.x) && Number.isFinite(value.y)) {
         const area = screen.getDisplayNearestPoint({ x: Math.round(value.x), y: Math.round(value.y) }).workArea;

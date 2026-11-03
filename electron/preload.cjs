@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('desktopLibrary', {
   getLocation: () => ipcRenderer.invoke('library:getLocation'),
   moveLibrary: () => ipcRenderer.invoke('library:move'),
   reclassify: (kind, type, bytes) => ipcRenderer.invoke('library:reclassify', kind, type, bytes),
+  removeImage: (kind, bytes) => ipcRenderer.invoke('library:removeImage', kind, bytes),
   scan: () => ipcRenderer.invoke('library:scan'),
   read: (id) => ipcRenderer.invoke('library:read', id),
   confirm: (id, kind) => ipcRenderer.invoke('library:confirm', id, kind),
