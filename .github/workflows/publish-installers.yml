@@ -1,0 +1,68 @@
+name: Publish built installers
+on:
+  workflow_dispatch:
+    inputs:
+      source_run:
+        description: Successful Desktop installers run ID
+        required: true
+      source_commit:
+        description: Expected source commit SHA
+        required: true
+      tag:
+        description: Pre-release tag
+        required: true
+        default: desktop-0.1.0-beta.1
+permissions:
+  contents: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      SOURCE_RUN: ${{ inputs.source_run }}
+      SOURCE_COMMIT: ${{ inputs.source_commit }}
+      RELEASE_TAG: ${{ inputs.tag }}
+    steps:
+      - name: Verify build identity
+        run: |
+          [[ "$SOURCE_RUN" =~ ^[0-9]+$ ]]
+          [[ "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$RELEASE_TAG" =~ ^[a-zA-Z0-9._-]+$ ]]
+          gh api "repos/$GH_REPO/actions/runs/$SOURCE_RUN" > build.json
+          node -e 'const r=require("./build.json");if(r.conclusion!=="success"||r.head_sha!==process.env.SOURCE_COMMIT||r.path!==".github/workflows/desktop.yml")throw Error("Build identity mismatch")'
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.source_run }}
+          pattern: installers-*
+          merge-multiple: true
+          path: installers
+      - name: Check installers and publish pre-release
+        working-directory: installers
+        run: |
+          node <<'NODE'
+          const fs=require('fs'),crypto=require('crypto');
+          const files=fs.readdirSync('.').filter(f=>/\.(exe|dmg)$/.test(f));
+          if(!files.some(f=>f.endsWith('.exe'))||!files.some(f=>f.endsWith('.dmg')))throw Error('Missing platform installer');
+          const sums=files.sort().map(file=>{
+            const bytes=fs.readFileSync(file);
+            if(bytes.length<1000000)throw Error('Installer is too small');
+            if(file.endsWith('.exe')&&bytes.toString('ascii',0,2)!=='MZ')throw Error('Invalid Windows installer');
+            if(file.endsWith('.dmg')&&bytes.toString('ascii',bytes.length-512,bytes.length-508)!=='koly')throw Error('Invalid Mac disk image');
+            return crypto.createHash('sha256').update(bytes).digest('hex')+'  '+file;
+          });
+          fs.writeFileSync('SHA256SUMS.txt',sums.join('\n')+'\n');
+          NODE
+          if gh release view "$RELEASE_TAG" --json isDraft,targetCommitish > existing.json; then
+            node -e 'const r=require("./existing.json");if(!r.isDraft||r.targetCommitish!==process.env.SOURCE_COMMIT)throw Error("Refusing to overwrite an existing release")'
+          else
+            gh release create "$RELEASE_TAG" --target "$SOURCE_COMMIT" --title "Desktop Wi-Fi transfer test" --notes "Unsigned pre-release for testing account-free local-network material transfers. Canvas sync is not included; real Mac/Windows interoperability still needs testing." --draft --prerelease
+          fi
+          mapfile -d '' files < <(find . -maxdepth 1 -type f \( -name '*.exe' -o -name '*.dmg' -o -name 'SHA256SUMS.txt' \) -print0)
+          gh release upload "$RELEASE_TAG" "${files[@]}" --clobber
+          gh release edit "$RELEASE_TAG" --draft=false --prerelease
+          gh release view "$RELEASE_TAG" --json url,assets
