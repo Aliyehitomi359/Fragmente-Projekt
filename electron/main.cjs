@@ -2,6 +2,7 @@ const { app, BrowserWindow, dialog, ipcMain, clipboard, nativeImage } = require(
 const { readClipboardPng } = require('./clipboard-image.cjs');
 const { createLibrary } = require('./library.cjs');
 const { createCapture } = require('./capture.cjs');
+const { createLanTransfer } = require('./lan-transfer.cjs');
 const { validateDestination, writeConfig, finishPendingMove } = require('./library-move.cjs');
 const fs = require('node:fs/promises');
 const path = require('node:path');
@@ -14,6 +15,17 @@ if (isDevelopment) {
 let mainWindow;
 let library;
 let capture;
+const lanTransfer = createLanTransfer({ approve: async ({ address, code }) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
+  mainWindow.show(); mainWindow.focus();
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: 'question', title: 'Allow material transfer?',
+    message: `A device on your local network wants to receive your materials.`,
+    detail: `Connection code: ${code}\nDevice address: ${address}\n\nOnly allow this if you just requested a transfer on your other device.`,
+    buttons: ['Allow transfer', 'Deny'], defaultId: 1, cancelId: 1,
+  });
+  return result.response === 0;
+} });
 let quitting = false;
 let rendererReady = false;
 let movingLibrary = false;
@@ -163,6 +175,12 @@ if (!app.requestSingleInstanceLock()) {
       });
     }
     openWindow();
+    for (const method of ['start', 'receive', 'stop']) {
+      ipcMain.handle(`lan-transfer:${method}`, (event, value) => {
+        if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) throw new Error('Untrusted sender');
+        return lanTransfer[method](value);
+      });
+    }
     ipcMain.handle('library:move', (event) => {
       if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) throw new Error('Untrusted sender');
       return moveLibrary();
@@ -194,5 +212,6 @@ if (!app.requestSingleInstanceLock()) {
     for (const pending of pendingCaptures.values()) { clearTimeout(pending.timer); pending.reject(new Error('App is quitting.')); }
     pendingCaptures.clear();
     capture?.destroy();
+    void lanTransfer.stop();
   });
 }

@@ -1,5 +1,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('desktopLibrary', {
+  startLanTransfer: snapshot => ipcRenderer.invoke('lan-transfer:start', snapshot),
+  receiveLanTransfer: code => ipcRenderer.invoke('lan-transfer:receive', code),
+  stopLanTransfer: () => ipcRenderer.invoke('lan-transfer:stop'),
   readClipboardImage: () => ipcRenderer.invoke('clipboard:read-image'),
   openFolder: () => ipcRenderer.invoke('library:openFolder'),
   getLocation: () => ipcRenderer.invoke('library:getLocation'),

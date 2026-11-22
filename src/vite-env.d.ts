@@ -2,6 +2,9 @@
 
 interface Window {
   desktopLibrary?: {
+    startLanTransfer(snapshot: string): Promise<{ code: string; expiresAt: number }>;
+    receiveLanTransfer(code: string): Promise<string>;
+    stopLanTransfer(): Promise<void>;
     readClipboardImage(): Promise<Uint8Array | null>;
     onCapture(callback: (payload: { id: string; kind: 'source' | 'fragment'; bytes: Uint8Array; name: string }) => void): () => void;
     completeCapture(id: string, error?: string): Promise<void>;

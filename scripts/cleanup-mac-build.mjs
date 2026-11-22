@@ -1,4 +1,4 @@
-import { readdir, rename, stat } from 'node:fs/promises';
+import { mkdir, readdir, rename, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,6 +11,7 @@ if (process.platform === 'darwin') {
   if (!artifacts.some(name => name.endsWith('.dmg') && name.startsWith('Fragmente-Projekt-'))) {
     throw new Error('No DMG found; leaving unpacked applications untouched.');
   }
+  await mkdir(path.join(homedir(), '.Trash'), { recursive: true });
   for (const directory of artifacts.filter(name => /^mac(?:-|$)/.test(name))) {
     const root = path.join(release, directory);
     if (!(await stat(root)).isDirectory()) continue;

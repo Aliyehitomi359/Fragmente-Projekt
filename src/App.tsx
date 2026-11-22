@@ -5,6 +5,7 @@ import Tesseract from 'tesseract.js';
 import { FolderImports } from './FolderImports';
 import { ClipboardImport } from './ClipboardImport';
 import { FragmentMergeDialog } from './FragmentMergeDialog';
+import { LanTransfer } from './LanTransfer';
 import {
   DEFAULT_BOX_ID,
   IS_DEMO,
@@ -2877,11 +2878,13 @@ function LibraryBackup({
   onDismissStatus,
   onExport,
   onImport,
+  onMaterialsImported,
 }: {
   status: string;
   onDismissStatus: () => void;
   onExport: () => Promise<void>;
   onImport: () => Promise<void>;
+  onMaterialsImported: () => Promise<void>;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [folderError, setFolderError] = useState('');
@@ -2907,6 +2910,7 @@ function LibraryBackup({
       {isOpen && (
         <div className="tools-panel">
           <div className="backup-actions">
+            {window.desktopLibrary?.startLanTransfer && !IS_DEMO && <LanTransfer onImported={onMaterialsImported} />}
             {window.desktopLibrary && <button title="Open the local Library containing your Sources and Fragments image files." onClick={async () => {
               try { await window.desktopLibrary!.openFolder(); setFolderError(''); setIsOpen(false); }
               catch (failure) { setFolderError(String(failure)); }
@@ -3735,6 +3739,7 @@ export default function App() {
           status={backupStatus}
           onDismissStatus={() => setBackupStatus('')}
           onExport={exportLibrary}
+          onMaterialsImported={refresh}
           onImport={importLibrary}
         />
         {workspaceMode === 'inspiration' ? (

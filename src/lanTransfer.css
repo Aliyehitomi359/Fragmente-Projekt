@@ -1,0 +1,13 @@
+.lan-dialog{width:min(560px,calc(100vw - 32px));max-height:calc(100dvh - 40px);overflow:auto;padding:20px;border:1px solid var(--ink);border-radius:4px;background:var(--card-paper,#f7f4eb);color:var(--ink)}
+.lan-dialog::backdrop{background:#0008}
+.lan-dialog header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.lan-dialog h2{margin:0;font-size:18px}
+.lan-dialog nav{display:flex;gap:6px;margin-bottom:18px}
+.lan-dialog nav button[aria-pressed=true]{background:var(--wine);color:white}
+.lan-dialog section{padding:0;background:none;border:0}
+.lan-dialog label{display:block;margin:12px 0;font-size:12px}
+.lan-dialog textarea{display:block;width:100%;min-height:85px;resize:vertical;margin-top:6px;padding:8px;font:12px monospace;overflow-wrap:anywhere;letter-spacing:0}
+.lan-dialog .lan-code{display:block;width:180px;max-width:100%;height:44px;margin-top:6px;padding:8px 12px;font:bold 24px monospace;letter-spacing:0;text-align:center}
+.lan-dialog button{font-size:12px;padding:6px 9px;margin-right:6px}
+.lan-dialog p{font-size:12px;overflow-wrap:anywhere}
+.lan-success{color:#245f3b}.lan-error{color:#8b1717}

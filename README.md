@@ -57,6 +57,23 @@ The folder scanner checks about every three seconds. Root images stay in place u
 
 ## Verification
 
+### Account-Free Local Network Transfer (Development)
+
+Open the desktop app on both devices, connect them to the same private local network, then open **Library settings > Transfer over Wi-Fi**.
+
+1. On the sending device, choose **Send > Create connection code** and confirm sharing.
+2. Enter the six uppercase letters shown on the sender into **Receive** on the other device. Lowercase letters are automatically capitalized.
+3. Click **Receive materials**. The app discovers the sender locally. Approve **Allow transfer** on the sending device, then review the received counts and click **Import materials**.
+4. Close the dialog or choose **Stop sharing** when finished. Codes expire after ten minutes. To send changes back, reverse the roles.
+
+No account, cloud service or Supabase configuration is needed. A temporary local IPv4 listener starts only after explicit confirmation. The six-letter code is a short identifier derived from a fresh local certificate, not an encryption password. The receiver pins the full certificate discovered on the LAN before sending application data, then transfers over TLS 1.3. The short identifier has only about 28 bits and does not provide strong standalone device identity; local discovery is not authenticated. For this reason each request also requires an explicit sender-side approval with the requesting IP address displayed. Approve only a transfer you just initiated on your other device, and use a trusted private network. No long-term account or device trust is stored. Local IP addresses, certificate fingerprints and transfer sizes are not hidden from the network. Discovery uses UDP multicast 239.255.83.71:48371; material data uses a temporary HTTPS port, not the discovery channel.
+
+Transfers include source/fragment images, OCR text, favorites, source notes, boxes and source cut-region references. Canvases and Inspiration sessions are not transferred. This is a manual snapshot transfer, not continuous bidirectional synchronization. Local deletions are never propagated. Existing identical records are skipped; when same-ID records differ, confirmation imports the incoming snapshot as a separate copy with remapped references. This deliberately favors preserving both versions over overwriting edits. Retrying the same snapshot is idempotent; an interrupted write can be retried.
+
+The first version supports desktop-to-desktop transfers only, with a 64 MB encoded transfer cap (45 MB of raw image bytes plus metadata). IPv6-only networks, browser/mobile receiving, incremental image transfer and resuming partial network downloads are not implemented. Discovery requires multicast access; if the network blocks it, use a different private network. The transport is platform-neutral, but a real Mac-to-Windows test is still required. Permit local-network access when the OS asks; do not disable the firewall. Guest Wi-Fi/client isolation or VPN routing can prevent a connection even on the same SSID. There is no need to expose Vite port 5175, forward router ports, or synchronize browser-data folders.
+
+Tests: `node --test electron/lan-transfer.test.cjs` and `node scripts/test-material-transfer.mjs`. Network tests bind only to the loopback interface and use synthetic data.
+
 ```sh
 npm run build
 node --test electron/library.test.cjs

@@ -3,7 +3,7 @@
   "private": true,
   "description": "Local-first poem collage and image fragment workspace",
   "main": "electron/main.cjs",
-  "version": "0.0.0",
+  "version": "0.1.0-beta.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,8 +11,8 @@
     "preview": "vite preview",
     "desktop": "npm run build && electron .",
     "desktop:dev": "node scripts/desktop-dev.mjs",
-    "package:mac": "npm run build && electron-builder --mac dmg zip && node scripts/cleanup-mac-build.mjs",
-    "package:win": "npm run build && electron-builder --win nsis"
+    "package:mac": "npm run build && electron-builder --mac dmg zip --publish never && node scripts/cleanup-mac-build.mjs",
+    "package:win": "npm run build && electron-builder --win nsis --publish never"
   },
   "build": {
     "appId": "org.fragmenteprojekt.desktop",
@@ -44,6 +44,7 @@
     "pngjs": "^7.0.0",
     "react": "latest",
     "react-dom": "latest",
+    "selfsigned": "^5.5.0",
     "tesseract.js": "latest",
     "utif": "^3.1.0"
   },
